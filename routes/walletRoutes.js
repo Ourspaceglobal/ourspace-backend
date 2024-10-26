@@ -15,7 +15,7 @@ router
 
 router
 .route("/so-download-invoice-as-pdf")
-.get(downloadBookingPDF)
+.get(protect, downloadBookingPDF)
 
 router
 .route("/so-get-banks-with-saved-accts")
