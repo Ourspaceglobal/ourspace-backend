@@ -11,6 +11,12 @@ const bookingSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    paymentType: {
+        type: String,
+        enum: ["paystack", "wallet"],
+        default: "paystack",
+        required: true
+    },
     spaceOwnerId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
@@ -28,10 +34,16 @@ const bookingSchema = new mongoose.Schema({
         default: 'pending',
         required: true
     },
-    bookingStatus: {
+    paymentStatus: {
         type: String,
         enum: ['pending','upcoming', 'in-progress','completed', "cancelled"],
         default: 'pending',
+        required: true
+    },
+    bookingStatus: {
+        type: String,
+        enum: ['pending','upcoming', 'in-progress','completed', "cancelled"],
+        default: 'upcoming',
         required: true
     },
     firstName: {

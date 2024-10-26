@@ -15,6 +15,6 @@ router
 
 router
 .route("/book-with-wallet")
-.patch(protect, bookWithWallet)
+.post(protect, bookWithWallet)
 
 export default router 
