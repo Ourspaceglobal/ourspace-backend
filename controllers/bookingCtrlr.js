@@ -707,6 +707,17 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
     }
 });
 
+export const cancelBooking = asyncHandler(async(req, res)=> {
+    console.log("Cancelling booking".yellow)
+
+    const { bookingId } = req.body
+
+    try {
+        const booking  = await Booking.findOne(bookingId)
+    } catch (error) {
+        
+    }
+})
 
 export const getBookingsForListingId = asyncHandler(async (req, res) => {
     const { listingId } = req.params;

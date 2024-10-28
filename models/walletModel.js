@@ -9,12 +9,10 @@ const walletSchema = new mongoose.Schema({
     userEmail: {
         type: String,
         required: true,
-        unique: true,
     },
     userType: {
         type: String,
-        enum: ["space-owner", "space-user"],
-        required: true
+        enum: ["space-owner", "space-user"]
     },
     currentBalance: {
         type: Number,
