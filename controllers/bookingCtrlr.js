@@ -6,7 +6,7 @@ import Booking from '../models/bookingModel.js';
 import Notification from '../models/notificationModel.js';
 import Message from '../models/messageModel.js';
 import { sendSuccessfulBookingMailToSpaceOwner, sendSuccessfulPaymentMail } from '../utils/authUtils.js';
-import { formatAmount } from '../utils/helperFunction.js';
+import { formatAmount, formatDate, formatDateWithoutTime } from '../utils/helperFunction.js';
 import Wallet from '../models/walletModel.js';
 
 function generateInvoiceId() {
@@ -131,12 +131,18 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
     const uniqueBookedDays = newBookedDays.length === 2 && newBookedDays[0] === newBookedDays[1] 
     ? [newBookedDays[0]] // Only keep one if both dates are the same
     : newBookedDays;
-
-    console.log("Final Booked dates: ", uniqueBookedDays);
     
 
     // Retrieve listing from database
     const listing = await Listing.findById(listingId).populate('user');
+
+    if (!listing) {
+        console.log("Listing not found".red);
+        return res.status(404).json({
+            success: false,
+            message: "Listing not found.",
+        });
+    }
 
     const listingCharge = listing.chargePerNight
     const totalNights = uniqueBookedDays.length
@@ -147,14 +153,6 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
     console.log("Booked dates: ", uniqueBookedDays)
 
     const amountInKobo = totalAmountIncured * 100;
-
-    if (!listing) {
-        console.log("Listing not found".red)
-        return res.status(404).json({
-            success: false,
-            message: 'Listing not found.',
-        });
-    }
 
     const conflictingDates = listing.calendar.unavailableDays.filter(date => uniqueBookedDays.includes(date));
 
@@ -212,7 +210,7 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
             totalIncuredCharge: totalAmountIncured,
             totalIncuredChargeAfterDiscount: totalAmountIncured,
             discount: discount || 0
-        });
+        }); 
         await newBooking.save()
         
 
@@ -388,6 +386,8 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
                 // If no wallet exists, create a new wallet for the user
                 wallet = new Wallet({
                     user: listing.user._id,
+                    userEmail: listing.user.email,
+                    userType: listing.user.userType,
                     totalEarned: realListingChargePerNIght,  
                     currentBalance: realListingChargePerNIght, 
                     totalWithdrawn: 0
@@ -516,49 +516,48 @@ export const handleCallback = async (req, res) => {
         });
     }
 }; 
+
 export const bookWithWallet = asyncHandler(async (req, res) => {
-    console.log("Creating a new booking with wallet".yellow);
+    console.log("Creating a new booking with wallet".green);
 
     const userId = req.user._id;
-    const { listingId, newBookedDays, totalGuest, discount } = req.body;
+    const { email, listingId, newBookedDays, firstName, lastName, phoneNumber, bookingForSomeone, totalGuest, discount } = req.body;
+
+    const requiredFields = {
+        email,
+        listingId, 
+        newBookedDays, 
+        firstName, 
+        lastName, 
+        phoneNumber, 
+        totalGuest
+    };
+
+    const missingFields = Object.entries(requiredFields)
+        .filter(([key, value]) => !value)
+        .map(([key]) => key);
+    
+    if (missingFields.length > 0) {
+        console.log("Missing fields:", missingFields.join(', ').red);
+        return res.status(400).json({
+            success: false,
+            message: `Missing the following field(s): ${missingFields.join(', ')}`
+        });
+    }
 
     try {
-        const wallet = await Wallet.findOne({ user: userId });
+        let wallet = await Wallet.findOne({ user: userId });
 
         if (!wallet) {
             wallet = new Wallet({
                 user: userId,
+                userEmail: req.user.email,
+                userType: req.user.userType,
                 currentBalance: 0, 
+                allTimeFunding: 0,
             });
             await wallet.save();
-            console.log("New wallet created for user".green);
-        }
-
-        const {
-            email, listingId, newBookedDays,
-            firstName, lastName, phoneNumber, bookingForSomeone, totalGuest, discount
-        } = req.body;
-    
-        const requiredFields = {
-            email,
-            listingId, 
-            newBookedDays, 
-            firstName, 
-            lastName, 
-            phoneNumber, 
-            totalGuest
-        };
-    
-        const missingFields = Object.entries(requiredFields)
-        .filter(([key, value]) => !value)
-        .map(([key]) => key);
-    
-        if (missingFields.length > 0) {
-            console.log("Missing fields:", missingFields.join(', ').red);
-            return res.status(400).json({
-                success: false,
-                message: `Missing the following field(s): ${missingFields.join(', ')}`
-            });
+            console.log("New wallet created for user".yellow);
         }
     
         const uniqueBookedDays = newBookedDays.length === 2 && newBookedDays[0] === newBookedDays[1] 
@@ -575,11 +574,10 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
         }
 
         // Calculate total incurred charge
-        const listingCharge = listing.chargePerNight
+        const listingChargePerNightWith10Percent = listing.chargePerNight
         const totalNights = uniqueBookedDays.length
-        const amountIncurred = listingCharge * totalNights
-        const totalAmountIncured = amountIncurred + 2000
-        const listingDiscount = listing.discount
+        const amountIncurred = listingChargePerNightWith10Percent * totalNights
+        const totalAmountIncuredWithTotalNightsAnd2000Charges = amountIncurred + 2000
 
         // Check for conflicting dates
         const conflictingDates = listing.calendar.unavailableDays.filter(date => newBookedDays.includes(date));
@@ -593,7 +591,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
         }
 
         // Check if wallet balance is enough
-        if (wallet.currentBalance < totalAmountIncured) {
+        if (wallet.currentBalance < totalAmountIncuredWithTotalNightsAnd2000Charges) {
             console.log("Insufficient wallet funds".red);
             return res.status(400).json({
                 success: false,
@@ -601,137 +599,104 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             });
         }
 
-        // Deduct the amount from wallet
-        wallet.currentBalance -= totalAmountIncured;
+        // Deduct balance and save
+        wallet.currentBalance -= totalAmountIncuredWithTotalNightsAnd2000Charges;
         await wallet.save();
 
         // Create new booking
         const newBooking = await Booking.create({
             user: userId,
             listing: listingId,
+            invoiceId: generateInvoiceId(),
             spaceOwnerId: listing.user._id,
+            firstName,
+            lastName,
+            email,
+            phoneNumber,
+            bookingForSomeone,
             paymentType: "wallet",
             paymentStatus: "completed",
-            bookedDays: newBookedDays,
+            bookedDays: uniqueBookedDays,
             totalGuest,
-            chargePerNight: listingCharge,
+            chargePerNight: listingChargePerNightWith10Percent,
             totalNight: totalNights,
-            totalIncuredCharge: totalAmountIncured,
-            totalIncuredChargeAfterDiscount: totalAmountIncured - (discount || 0),
-            discount: discount || 0
+            totalIncuredCharge: totalAmountIncuredWithTotalNightsAnd2000Charges,
+            totalIncuredChargeAfterDiscount: totalAmountIncuredWithTotalNightsAnd2000Charges - (discount || 0),
+            discount: discount || 0,
+            bookingStatus: "pending"
         });
 
-        newBooking.invoiceId = generateInvoiceId()
-        await newBooking.save()
+        // Update listing with booked days
+        listing.calendar.bookedDays = [...listing.calendar.bookedDays, ...uniqueBookedDays];
+        if (!listing.propertyUsers.includes(userId)) {
+            listing.propertyUsers.push(userId); 
+        }
+        await listing.save();
 
-        if(listing) {
-            const newBookedDays = uniqueBookedDays;
-            // console.log("Booked days: ",newBookedDays)
-            listing.calendar.bookedDays = [...listing.calendar.bookedDays, ...newBookedDays];
-            // Check if the user is already in propertyUsers
-            if (!listing.propertyUsers.includes(userId)) {
-                listing.propertyUsers.push(userId); 
-            }
-            
-            await listing.save();
+        console.log("Transaction verified, listing and booking details updated successfully.".cyan);
 
-            console.log("Transaction verified, listing and booking details updated successfully.".cyan);
+        // Update space owner's wallet
+        let spaceOwnerWallet = await Wallet.findOne({ user: listing.user._id });
+        const listingChargePerNightWithout10PercentWithTotalNight = listing.chargePerNightWithout10Percent * uniqueBookedDays.length
 
-            const listingOwner = listing.user;
-
-            console.log("Updating wallet".blue) 
-
-            let wallet = await Wallet.findOne({ user: listing.user._id });
-
-            // Subtract 10% and 2000 from the total incurred charge
-            const realListingChargePerNIght = listing.chargePerNightWithout10Percent * newBookedDays
-
-            if (!wallet) {
-                console.log("No wallet info found, creating a new one".yellow);
-                wallet = new Wallet({
-                    user: listing.user._id,
-                    totalEarned: realListingChargePerNIght,  
-                    currentBalance: realListingChargePerNIght, 
-                    totalWithdrawn: 0
-                });
-            } else {
-                // Update the existing wallet
-                const newTotalEarned = wallet.totalEarned + realListingChargePerNIght;
-                const newCurrentBalance = newTotalEarned - wallet.totalWithdrawn;
-
-                wallet.totalEarned = newTotalEarned;
-                wallet.currentBalance = newCurrentBalance;
-            }
-
-            await wallet.save();
-            console.log("Wallet successfully updated".green)
-
-            // create a new notification
-            await Notification.create({
-                user: userId,
-                listing: listingId,
-                title: listing.propertyName,
-                subTitle: `Your payment of ₦${formatAmount(totalAmountIncured)} has been confirmed and your booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
-            });
-
-            console.log("Notification created successfully.".green);
-
-            // Create a new message for the user
-            await Message.create({
-                sender: listingOwner._id,
-                receiver: req.user._id,
-                listing: listingId,
-                propertyUserId: req.user._id, 
-                content: `Your payment of ₦${formatAmount(totalAmountIncured)} has been confirmed and your booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
-            });
-
-            const formattedAmount = formatAmount(amountPaidToPaystack)
-
-            // Send mail to space user
-            await sendSuccessfulPaymentMail(
-                req.user.email, 
-                req.user.firstName, 
-                listing.propertyName, 
-                totalBookedNights, 
-                formattedAmount
-            );
-
-            const formattedBookingTotalCharge = formatAmount(totalAmountIncured)
-    
-            // Send mail to listing owner
-            await sendSuccessfulBookingMailToSpaceOwner(
-                listing.user.email,
-                req.user.firstName,
-                listing.propertyName,
-                totalBookedNights,
-                newBookedDays,
-                formattedBookingTotalCharge
-            )
-
-            console.log("Wallet: ", wallet)
-
-            res.status(200).json({
-                success: true,
-                message: 'Transaction verified, listing and booking details updated successfully.',
-                data: {
-                    booking,
-                },
+        if (!spaceOwnerWallet) {
+            spaceOwnerWallet = new Wallet({
+                user: listing.user._id,
+                userEmail: listing.user.email,
+                userType: listing.user.userType,
+                totalEarned: listingChargePerNightWithout10PercentWithTotalNight,  
+                currentBalance: listingChargePerNightWithout10PercentWithTotalNight, 
+                totalWithdrawn: 0
             });
         } else {
-            console.log("Listing not found, unable to update booked days".red);
-            return res.status(400).json({
-                success: false,
-                message: "Listing not found, unable to update booked days"
-            });
+            spaceOwnerWallet.totalEarned += listingChargePerNightWithout10PercentWithTotalNight;
+            spaceOwnerWallet.currentBalance = spaceOwnerWallet.totalEarned - spaceOwnerWallet.totalWithdrawn;
         }
+        await spaceOwnerWallet.save();
 
-        console.log("Booking created with wallet funds".green);
-        res.status(200).json({
-            success: true,
-            message: "Booking successfully created using wallet funds.",
-            data: newBooking
+        console.log("Wallet successfully updated".green);
+
+        // Create notification and message
+        await Notification.create({
+            user: userId,
+            listing: listingId,
+            title: listing.propertyName,
+            subTitle: `Your payment of ₦${formatAmount(totalAmountIncuredWithTotalNightsAnd2000Charges)} has been confirmed and your booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
         });
 
+        await Message.create({
+            sender: listing.user._id,
+            receiver: req.user._id,
+            listing: listingId,
+            propertyUserId: req.user._id, 
+            content: `Your payment of ₦${formatAmount(totalAmountIncuredWithTotalNightsAnd2000Charges)} has been confirmed and your booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
+        });
+
+        console.log("Notification and message created successfully.".green);
+
+        const formattedBooking = {
+            id: newBooking._id,
+            paymentMethod: newBooking.paymentType,
+            invoiceId: newBooking.invoiceId,
+            paymentStatus: newBooking.paymentStatus,
+            bookingStatus: newBooking.bookingStatus,
+            firstName: newBooking.firstName,
+            lastName: newBooking.lastName,
+            email: newBooking.email,
+            phone: newBooking.phoneNumber,
+            bookingForSomeone: newBooking.bookingForSomeone,
+            bookedDays: newBooking.bookedDays,
+            totalGuest: newBooking.totalGuest,
+            totalNights: newBooking.totalNight,
+            totalIncuredCharge: newBooking.totalIncuredCharge,
+            createdAt: formatDate(newBooking.updatedAt)
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Booking created with wallet funds",
+            data: formattedBooking
+        });
     } catch (error) {
         console.error("Error creating booking with wallet:", error);
         res.status(500).json({
@@ -741,6 +706,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
         });
     }
 });
+
 
 export const getBookingsForListingId = asyncHandler(async (req, res) => {
     const { listingId } = req.params;

@@ -6,6 +6,16 @@ const walletSchema = new mongoose.Schema({
         ref: "User",
         required: true
     },
+    userEmail: {
+        type: String,
+        required: true,
+        unique: true,
+    },
+    userType: {
+        type: String,
+        enum: ["space-owner", "space-user"],
+        required: true
+    },
     currentBalance: {
         type: Number,
         default: 0

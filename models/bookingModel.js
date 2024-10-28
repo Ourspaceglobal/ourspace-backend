@@ -14,7 +14,6 @@ const bookingSchema = new mongoose.Schema({
     paymentType: {
         type: String,
         enum: ["paystack", "wallet"],
-        default: "paystack",
         required: true
     },
     spaceOwnerId: {
@@ -26,18 +25,16 @@ const bookingSchema = new mongoose.Schema({
         default: null, 
         unique: true 
     },
-    paystackAccessCode: { type: String, required: true },
-    paystackReference: { type: String, required: true },
+    paystackAccessCode: { type: String },
+    paystackReference: { type: String },
     paystackPaymentStatus: {
         type: String,
         enum: ['pending', 'success', 'failed'],
-        default: 'pending',
-        required: true
     },
     paymentStatus: {
         type: String,
-        enum: ['pending','upcoming', 'in-progress','completed', "cancelled"],
-        default: 'pending',
+        enum: ['payment-pending','upcoming', 'in-progress','completed', "cancelled"],
+        default: 'payment-pending',
         required: true
     },
     bookingStatus: {
