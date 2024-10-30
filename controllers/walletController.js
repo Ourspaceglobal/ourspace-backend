@@ -667,7 +667,7 @@ export const getTransactionsForSpaceUsersWallet = asyncHandler(async (req, res) 
     try {
         const bookings = await Booking.find(filter)
             .populate("listing")
-            .sort({ createdAt: -1 });
+            .sort({ updatedAt: -1 });
 
         // Format booking data
         const formattedBookings = bookings.map((booking) => ({
