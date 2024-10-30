@@ -29,7 +29,7 @@ export const spaceOwnerGetWallet = asyncHandler(async (req, res) => {
             paystackPaymentStatus: "success"
          })
             .populate('listing')
-            .populate('user');
+            .populate('user').sort({updatedAt: -1});
 
         console.log(`Total of ${bookings.length} bookings found`.green);
 
