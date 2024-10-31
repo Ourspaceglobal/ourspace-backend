@@ -795,10 +795,10 @@ const getSingleUserListing = asyncHandler(async (req, res) => {
       listing = await Listing.findById(listingId);
 
       if (!listing) {
-        const draftListing = await DraftListing.findById(id).populate("user")
+        const draftListing = await DraftListing.findById(listingId).populate("user")
 
         if(!draftListing) {
-          console.log(`Listing with ID: ${id} not found`.red);
+          console.log(`Listing with ID: ${listingId} not found`.red);
           return res.status(404).json({
               success: false,
               message: "Listing not found",
