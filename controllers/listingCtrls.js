@@ -125,7 +125,7 @@ const createListing = asyncHandler(async (req, res) => {
     'otherPictures'
   ];
 
-  // Centralized image deletion function
+  // Centralized image deletion function in case of an error during listing creation
   const deleteUploadedImages = async (imageArrays) => {
     const allPublicIds = imageArrays.flat().map(image => image.public_id);
     if (allPublicIds.length > 0) {

@@ -8,7 +8,7 @@ import sendEmail from '../../utils/sendMail.js';
 import { sendListingApprovedEmail, sendListingRejectedEmail } from '../../utils/authUtils.js';
 import DraftListing from '../../models/draftListingModel.js';
 import User from '../../models/userModel.js';
-import { formatSaveForLaterListingData } from '../../utils/formatListingData.js';
+import { formatListingData, formatSaveForLaterListingData } from '../../utils/formatListingData.js';
 
 const getCoordinates = async (address) => {
     try {
@@ -594,3 +594,232 @@ export const adminSaveListingForLater = asyncHandler(async (req, res) => {
       });
     }
   });
+
+export const adminCreateNewListing = asyncHandler(async (req, res) => {
+    console.log("Admin creating a new listing".yellow);
+    const userId = req.user._id.toString();
+
+    const { selectedUserEmail } = req.body
+
+    console.log("Selected user email: ", selectedUserEmail)
+
+    let selectedUser;
+    let selectedUserId
+
+    if(selectedUserEmail) {
+
+        selectedUser = await User.findOne({email: selectedUserEmail})
+
+        selectedUserId = selectedUser._id
+
+        if(!selectedUser) {
+            console.log("The selected user cannot be found".red)
+            return res.status(404).json({
+                success: false,
+                message: "The selected user cannot be found in the list of users"
+            })
+        }
+    }
+
+    console.log("SelectedUserId: ",selectedUserId)
+  
+    if (!req.user.isAdmin) {
+      console.log("Only admins are allowed".red);
+      return res.status(401).json({
+        success: false,
+        message: "Only admins are allowed"
+      });
+    }
+  
+    // Validate property type against the allowed values
+    const propertyTypes = req.body.propertyType;
+    let propertyTypeArray;
+  
+    if (typeof propertyTypes === 'string') {
+      propertyTypeArray = propertyTypes.split(',').map(type => type.trim());
+    } else if (Array.isArray(propertyTypes)) {
+      propertyTypeArray = propertyTypes;
+    } else {
+      console.log("Invalid property type format".red);
+      return res.status(400).json({
+        success: false,
+        message: "Property type must be a string or an array of strings."
+      });
+    }
+  
+    const invalidPropertyTypes = propertyTypeArray.filter(type => !allowedPropertyTypes.includes(type));
+    if (invalidPropertyTypes.length > 0) {
+      console.log(`Invalid property types: ${invalidPropertyTypes.join(', ')}`.red);
+      return res.status(500).json({
+        success: false,
+        message: `Invalid property type(s): ${invalidPropertyTypes.join(', ')}. Allowed types are: ${allowedPropertyTypes.join(', ')}`
+      });
+    }
+  
+    // Initialize image arrays
+    let bedroomPictures = [];
+    let livingRoomPictures = [];
+    let bathroomToiletPictures = [];
+    let kitchenPictures = [];
+    let facilityPictures = [];
+    let otherPictures = [];
+  
+    const imageCategories = [
+      'bedroomPictures', 
+      'livingRoomPictures', 
+      'bathroomToiletPictures', 
+      'kitchenPictures', 
+      'facilityPictures', 
+      'otherPictures'
+    ];
+  
+    // Centralized image deletion function in case of an error during listing creation
+    const deleteUploadedImages = async (imageArrays) => {
+      const allPublicIds = imageArrays.flat().map(image => image.public_id);
+      if (allPublicIds.length > 0) {
+        try {
+          await deleteImagesFromCloudinary(allPublicIds);
+        } catch (deleteError) {
+          console.error("Error during image deletion:", deleteError);
+        }
+      }
+    };
+  
+    try {
+      console.log('Formatting listings'.cyan);
+      const formattedData = formatListingData(req);
+  
+      const chargePerNightWithout10Percent = formattedData.chargePerNight
+      console.log("pure charge per night: ", chargePerNightWithout10Percent)
+  
+      formattedData.chargePerNight = Math.round(formattedData.chargePerNight * 1.1);
+  
+      let latitude, longitude;
+  
+      if (formattedData.propertyLocation.latitude && formattedData.propertyLocation.longitude) {
+        latitude = formattedData.propertyLocation.latitude;
+        longitude = formattedData.propertyLocation.longitude;
+      } else {
+        try {
+          const { address, city, state } = formattedData.propertyLocation;
+          const fullAddress = `${address}, ${city}, ${state}`;
+          const coordinates = await getCoordinates(fullAddress);
+  
+          latitude = coordinates.latitude;
+          longitude = coordinates.longitude;
+  
+          console.log(`Latitude: ${latitude} and Longitude: ${longitude} obtained`.cyan);
+        } catch (error) {
+          console.log(`Error getting coordinates: ${error}`.red);
+          return res.status(500).json({ success: false, message: `Error getting coordinates: ${error.message}` });
+        }
+      }
+  
+      // Retrieve existing images from draft if they exist
+      const existingDraftListing = req.body.listingId ? await DraftListing.findById(req.body.listingId) : null;
+      if (existingDraftListing) {
+        console.log("Fetching images from draft listing".yellow);
+        bedroomPictures = existingDraftListing.bedroomPictures || [];
+        livingRoomPictures = existingDraftListing.livingRoomPictures || [];
+        bathroomToiletPictures = existingDraftListing.bathroomToiletPictures || [];
+        kitchenPictures = existingDraftListing.kitchenPictures || [];
+        facilityPictures = existingDraftListing.facilityPictures || [];
+        otherPictures = existingDraftListing.otherPictures || [];
+      }
+  
+      // Upload images concurrently
+      try {
+        console.log("Uploading new pictures if available".cyan);
+      
+        const uploadPromises = imageCategories.map(category => {
+          if (req.files && req.files[category]) {
+            // Upload new images and replace existing ones
+            return uploadListingImagesToCloudinary(req.files[category]);
+          } else {
+            // No new images for this category, keep the existing draft images
+            return Promise.resolve(existingDraftListing ? existingDraftListing[category] || [] : []);
+          }
+        });
+      
+        const [newBedroomPics, newLivingRoomPics, newBathroomToiletPics, newKitchenPics, newFacilityPics, newOtherPics] = await Promise.all(uploadPromises);
+      
+        // Use either the new uploaded images or the existing draft images, do not merge
+        bedroomPictures = newBedroomPics.length > 0 ? newBedroomPics : bedroomPictures;
+        livingRoomPictures = newLivingRoomPics.length > 0 ? newLivingRoomPics : livingRoomPictures;
+        bathroomToiletPictures = newBathroomToiletPics.length > 0 ? newBathroomToiletPics : bathroomToiletPictures;
+        kitchenPictures = newKitchenPics.length > 0 ? newKitchenPics : kitchenPictures;
+        facilityPictures = newFacilityPics.length > 0 ? newFacilityPics : facilityPictures;
+        otherPictures = newOtherPics.length > 0 ? newOtherPics : otherPictures;
+      
+        console.log("Pictures uploaded successfully".yellow);
+      } catch (error) {
+        console.error('Error uploading images:', error.stack || JSON.stringify(error, null, 2));
+        await deleteUploadedImages([bedroomPictures, livingRoomPictures, bathroomToiletPictures, kitchenPictures, facilityPictures, otherPictures]);
+        return res.status(500).json({
+          success: false,
+          message: `Error uploading listing images: ${error.message || error}`
+        });
+      }
+  
+      // Create a new listing in the database
+      const newListingData = {
+        ...formattedData,
+        user: existingDraftListing.user,
+        chargePerNightWithout10Percent,
+        propertyId: generateListingId(),
+        propertyLocation: {
+          ...formattedData.propertyLocation,
+          latitude,
+          longitude,
+        },
+        bedroomPictures,
+        livingRoomPictures,
+        bathroomToiletPictures,
+        kitchenPictures,
+        facilityPictures,
+        otherPictures,
+        propertyType: propertyTypeArray
+      };
+  
+      if (req.body.listingId) {
+        newListingData._id = req.body.listingId;
+      }
+
+      if(req.body.selectedUserEmail) {
+        console.log("User email is selected for listing".green)
+        newListingData.user = selectedUserId
+      }
+
+      console.log("New listing owner id: ", selectedUserId)
+      
+  
+      const newListing = await Listing.create(newListingData);
+  
+      // If draft exists, delete it after successful creation
+      if (req.body.listingId) {
+        try {
+          const deletedDraft = await DraftListing.findOneAndDelete({ _id: req.body.listingId });
+          if (deletedDraft) {
+            console.log("Draft listing deleted successfully".green);
+          }
+        } catch (deleteDraftError) {
+          console.error("Error deleting draft listing:", deleteDraftError);
+        }
+      }
+  
+      console.log("New Listing successfully created".magenta);
+      return res.status(201).json({
+        success: true,
+        message: "You've successfully created a new listing",
+        data: newListing
+      });
+    } catch (error) {
+      console.error('Error creating property listing:', error.stack || error);
+      await deleteUploadedImages([bedroomPictures, livingRoomPictures, bathroomToiletPictures, kitchenPictures, facilityPictures, otherPictures]);
+      return res.status(500).json({
+        success: false,
+        message: `Server error: ${error.message}`,
+        error
+      });
+    }
+});

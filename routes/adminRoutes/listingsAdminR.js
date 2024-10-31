@@ -1,6 +1,6 @@
 import express from "express";
 import { protect, admin } from "../../middleware/authMiddleware.js";
-import { adminSaveListingForLater, getAllListings, getAllSpaceOwners, getListingById, tempUpdateListingStatus, updateListingStatus, updateStatus } from "../../controllers/adminCtrls/listingsAdminC.js";
+import { adminCreateNewListing, adminSaveListingForLater, getAllListings, getAllSpaceOwners, getListingById, tempUpdateListingStatus, updateListingStatus, updateStatus } from "../../controllers/adminCtrls/listingsAdminC.js";
 import upload from "../../uploadUtils/multer.js";
 
 const router = express.Router()
@@ -19,6 +19,17 @@ router
     { name: 'facilityPictures', maxCount: 10 },
     { name: 'otherPictures', maxCount: 10 }
   ]), adminSaveListingForLater);
+
+router
+  .route('/admin-create-listing')
+  .post(protect, upload.fields([
+    { name: 'bedroomPictures', maxCount: 10 },
+    { name: 'livingRoomPictures', maxCount: 10 },
+    { name: 'bathroomToiletPictures', maxCount: 10 },
+    { name: 'kitchenPictures', maxCount: 10 },
+    { name: 'facilityPictures', maxCount: 10 },
+    { name: 'otherPictures', maxCount: 10 }
+  ]), adminCreateNewListing);
 
 router
 .route("/update-status")
