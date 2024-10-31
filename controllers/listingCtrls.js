@@ -483,16 +483,12 @@ const getSingleListing = asyncHandler(async (req, res) => {
       const listing = await Listing.findById(id).populate('user');
 
       if(!listing) {
-        const draftListing = await DraftListing.findById(id).populate("user")
-
-        if(!draftListing) {
-          console.log(`Listing with ID: ${id} not found`.red);
+        console.log(`Listing with ID: ${id} not found`.red);
           return res.status(404).json({
               success: false,
               message: "Listing not found",
           });
         }
-      }
 
       const formattedUser = {
         id: listing.user._id,
@@ -788,20 +784,27 @@ const getListingByCategory = asyncHandler(async (req, res) => {
 const getSingleUserListing = asyncHandler(async (req, res) => {
   console.log("Fetching a single user listing".blue);
 
-  const { listingId } = req.query;
+  const { listingId } = req.params;
+  console.log("listing id:", listingId)
 
   try {
       console.log(`Searching for listing`.yellow);
 
       // Fetch the listing from the database using the provided ID
-      const listing = await Listing.findById(listingId);
+      let listing;
+      listing = await Listing.findById(listingId);
 
       if (!listing) {
-          console.log(`Listing with ID: ${listingId} not found`.red);
+        const draftListing = await DraftListing.findById(id).populate("user")
+
+        if(!draftListing) {
+          console.log(`Listing with ID: ${id} not found`.red);
           return res.status(404).json({
               success: false,
               message: "Listing not found",
           });
+        }
+        listing = draftListing
       }
 
       
