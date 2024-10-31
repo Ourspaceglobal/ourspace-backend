@@ -32,6 +32,7 @@ import waitlistAdminRoute from "./routes/adminRoutes/waitlistAdminRoute.js";
 import authAdminR from "./routes/adminRoutes/authAdminR.js";
 import usersAdminR from "./routes/adminRoutes/usersAdminR.js";
 import listingsAdminR from "./routes/adminRoutes/listingsAdminR.js";
+import morgan from "morgan";
 
 dotenv.config();
 
@@ -40,6 +41,8 @@ await db.connectDb();
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+app.use(morgan("dev"))
 
 // Middleware
 app.use(session({

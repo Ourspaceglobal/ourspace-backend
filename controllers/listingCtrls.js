@@ -25,7 +25,7 @@ const getCoordinates = async (address) => {
 function generateListingId() {
   const randomDigits = Array.from({ length: 6 }, () => Math.floor(Math.random() * 10)).join('');
   return `OS${randomDigits}`;
-}
+} 
 
 // UPLOAD IMAGES
 const uploadListingImagesToCloudinary = async (items) => {
@@ -271,7 +271,6 @@ const createListing = asyncHandler(async (req, res) => {
   }
 });
 
-
 const saveListingForLater = asyncHandler(async (req, res) => {
   console.log("Saving new listing to draft".yellow);
   const userId = req.user._id.toString();
@@ -472,7 +471,7 @@ const saveListingForLater = asyncHandler(async (req, res) => {
       error,
     });
   }
-});
+}); 
 
 const getSingleListing = asyncHandler(async (req, res) => {
   console.log("Fetching a single listing for any user".blue);

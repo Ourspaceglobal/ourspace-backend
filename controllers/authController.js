@@ -13,6 +13,7 @@ import { generateOTP, saveOTPToDatabase, sendOTPByEmail, sendWelcomeEmail, verif
 import sendEmail from '../utils/sendMail.js';
 import { passwordResetEmailTemplate } from '../email_templates/passwordResetEmailTemplate.js';
 import axios from 'axios';
+import Wallet from '../models/walletModel.js';
 
 const defaultImageUrl = "https://res.cloudinary.com/dyshmmjis/image/upload/w_1000,c_fill,ar_1:1,g_auto,r_max,bo_5px_solid_red,b_rgb:262c35/v1727616368/default_image_oh8fhs.png"
 
@@ -454,6 +455,20 @@ const suLogin = asyncHandler(async (req, res) => {
 
             const { accessToken, refreshToken } = generateTokens(res, user._id);
 
+            let wallet = await Wallet.findOne({ user: userId });
+
+            if(!wallet) {
+                wallet = new Wallet({
+                    user: userId,
+                    userEmail: req.body.email,
+                    userType: "space-user",
+                    currentBalance: 0, 
+                    allTimeFunding: 0,
+                });
+                await wallet.save();
+                console.log("New wallet successfully created".rainbow)
+            }
+
             console.log(`Welcome back ${user.firstName}, you're successfully logged in`.magenta);
             res.status(201).json({
                 accessToken: accessToken,
@@ -514,6 +529,22 @@ const soLogin = asyncHandler(async (req, res) => {
 
             // Generate a JWT token
             const { accessToken, refreshToken } = generateTokens(res, user._id);
+
+            let wallet = await Wallet.findOne({ user: userId });
+
+            if(!wallet) {
+                console.log("Creating a new wallet for user".blue)
+                wallet = new Wallet({
+                    user: userId,
+                    userEmail: req.body.email,
+                    userType: "space-owner",
+                    currentBalance: 0, 
+                    totalEarned: 0,
+                    totalWithdrawn: 0
+                });
+                await wallet.save();
+                console.log("New wallet successfully created".rainbow)
+            }
 
             console.log(`Welcome back ${user.firstName}, you're successfully logged in`.magenta);
             res.status(201).json({

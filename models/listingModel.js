@@ -184,7 +184,7 @@ const listingsSchema = new mongoose.Schema({
     cancellationOption: {
       type: String,
       enum: ['flexible', 'moderate', 'firm', 'strict'],
-      default: "flexible",
+      default: "strict",
     },
 
     calendar: {
