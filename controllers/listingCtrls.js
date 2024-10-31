@@ -799,7 +799,7 @@ const getSingleUserListing = asyncHandler(async (req, res) => {
 
         if(!draftListing) {
           console.log(`Listing with ID: ${listingId} not found`.red);
-          return res.status(404).json({
+          return res.status(500).json({
               success: false,
               message: "Listing not found",
           });
