@@ -479,12 +479,11 @@ const getSingleListing = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   try {
-      // console.log(`Searching for listing with ID: ${id}`.yellow);
 
       const listing = await Listing.findById(id).populate('user');
 
       if(!listing) {
-        const draftListing = await DraftListing.findById(id)
+        const draftListing = await DraftListing.findById(id).populate("user")
 
         if(!draftListing) {
           console.log(`Listing with ID: ${id} not found`.red);

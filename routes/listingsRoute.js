@@ -12,7 +12,8 @@ import {
     getListingByCategory,
     getAllListingForHomepage,
     addSpaceOwnerIdToBookings,
-    updateInvoiceIdsForBookings
+    updateInvoiceIdsForBookings,
+    getSingleUserListing
  } from '../controllers/listingCtrls.js';
 import upload from '../uploadUtils/multer.js';
 
@@ -65,7 +66,7 @@ router
 // Get user listings
 router
 .route("/get-user-single-listings/:id")
-.get(getSingleListing)
+.get(protect, getSingleUserListing)
 
 
 router
