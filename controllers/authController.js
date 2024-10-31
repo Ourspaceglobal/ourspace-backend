@@ -166,6 +166,22 @@ const spaceUserSignUp = asyncHandler(async (req, res) => {
             await sendWelcomeEmail(newUser.email, newUser.firstName)
             await saveOTPToDatabase(userId, otp, hashedOTP);
             await sendOTPByEmail(email, otp);
+
+            let wallet = await Wallet.findOne({ user: userId });
+
+            if(!wallet) {
+                console.log("Creating a new wallet for user".blue)
+                wallet = new Wallet({
+                    user: userId,
+                    userEmail: req.body.email,
+                    userType: "space-user",
+                    currentBalance: 0, 
+                    totalEarned: 0,
+                    totalWithdrawn: 0
+                });
+                await wallet.save();
+                console.log("New wallet successfully created".rainbow)
+            }
             console.log(`OTP successfully sent to ${email}`);
             
             return res.json({
@@ -293,6 +309,23 @@ const spaceOwnerSignUp = asyncHandler(async (req, res) => {
             await sendWelcomeEmail(newUser.email, newUser.firstName)
             await saveOTPToDatabase(userId, otp, hashedOTP);
             await sendOTPByEmail(email, otp);
+
+            let wallet = await Wallet.findOne({ user: userId });
+
+            if(!wallet) {
+                console.log("Creating a new wallet for user".blue)
+                wallet = new Wallet({
+                    user: userId,
+                    userEmail: req.body.email,
+                    userType: "space-owner",
+                    currentBalance: 0, 
+                    totalEarned: 0,
+                    totalWithdrawn: 0
+                });
+                await wallet.save();
+                console.log("New wallet successfully created".rainbow)
+            }
+
             console.log(`Registration successful. OTP successfully sent to ${email}`);
             
             return res.json({
@@ -610,6 +643,28 @@ const continueWithGoogle = asyncHandler(async (req, res, next) => {
                 userType
             });
             await user.save();
+
+            const newUser = await User.findOne({email: payload.email})
+
+            const userId = newUser._id
+
+            // Create new wallet for user 
+            let wallet = await Wallet.findById(userId);
+
+            if(!wallet) {
+                console.log("Creating a new wallet for user".blue)
+                wallet = new Wallet({
+                    user: userId,
+                    userEmail: payload.email,
+                    userType: "space-owner",
+                    currentBalance: 0, 
+                    totalEarned: 0,
+                    totalWithdrawn: 0
+                });
+                await wallet.save();
+                console.log("New wallet successfully created".rainbow)
+            }
+
             const { accessToken, refreshToken } = generateTokens(res, user._id);
             console.log(`You've successfully registerd as a new ${userType}`.america)
             res.json({
