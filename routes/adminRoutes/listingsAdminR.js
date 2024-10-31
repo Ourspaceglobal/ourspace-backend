@@ -33,7 +33,7 @@ router
 .get(protect, admin, getAllSpaceOwners)
 
 router
-.route("/get-single-listing/:id")
+.route("/:id")
 .get(protect, admin, getListingById)  
 
 export default router
