@@ -13,7 +13,7 @@ import {
     getAllListingForHomepage,
     addSpaceOwnerIdToBookings,
     updateInvoiceIdsForBookings,
-    usersGetSingleListingInfoById
+    soGetSingleListingById
  } from '../controllers/listingCtrls.js';
 import upload from '../uploadUtils/multer.js';
 
@@ -53,6 +53,10 @@ router
 router
 .route("/get-user-listings")
 .get(protect, soGetAllListings)
+
+router
+.route("/so-get-single-listing-by-id/:listingId")
+.get(protect, soGetSingleListingById)
 
 router
 .route("/get-listings-by-category")

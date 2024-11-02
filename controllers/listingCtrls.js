@@ -675,6 +675,13 @@ const soGetAllListings = asyncHandler(async (req, res) => {
       console.log("Fetching user listings".blue);
 
       // Find listings based on the query object
+      if(req.user.userType !== "space-owner") {
+        console.log("Only space owner is allowed".red)
+        return res.status(500).json({
+          success: false,
+          message: "Only space owners are allowed"
+        })
+      }
       const listings = await Listing.find({user: req.user._id});
       const draftListings = await DraftListing.find({user: req.user._id})
 
@@ -781,21 +788,21 @@ const getListingByCategory = asyncHandler(async (req, res) => {
 });
 
 
-const usersGetSingleListingInfoById = asyncHandler(async (req, res) => {
-  console.log("Fetching a single listing".blue);
+const soGetSingleListingById = asyncHandler(async (req, res) => {
+  console.log("Space owner getting a single listing by id".yellow);
 
-  const { id } = req.params;
+  const { listingId } = req.params;
 
   try {
-      // console.log(`Searching for listing with ID: ${id}`.yellow);
+      // console.log(`Searching for listing with listingId: ${listingId}`.yellow);
 
-      const listing = await Listing.findById(id);
+      const listing = await Listing.findById(listingId);
 
       if(!listing) {
-        const draftListing = await DraftListing.findById(id)
+        const draftListing = await DraftListing.findById(listingId)
 
         if(!draftListing) {
-          console.log(`Listing with ID: ${id} not found`.red);
+          console.log(`Listing with listingId: ${listingId} not found`.red);
           return res.status(404).json({
               success: false,
               message: "Listing not found",
@@ -818,7 +825,7 @@ const usersGetSingleListingInfoById = asyncHandler(async (req, res) => {
           error,
       });
   }
-}); 
+});
 
 const editListing = asyncHandler(async (req, res) => {
   console.log("Editing listing".yellow);
@@ -1163,7 +1170,7 @@ soGetAllListings,
 getAllListingForHomepage,
 getListingByCategory,
 getSingleListing,
-usersGetSingleListingInfoById,
+soGetSingleListingById,
 editListing,
 saveListingForLater,
 deleteListing,
