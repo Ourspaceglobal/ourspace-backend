@@ -781,7 +781,7 @@ const getListingByCategory = asyncHandler(async (req, res) => {
 });
 
 
-const getSingleUserListing = asyncHandler(async (req, res) => {
+const usersGetSingleListingInfoById = asyncHandler(async (req, res) => {
   console.log("Fetching a single user listing".blue);
 
   const { listingId } = req.params;
@@ -1166,7 +1166,7 @@ soGetAllListings,
 getAllListingForHomepage,
 getListingByCategory,
 getSingleListing,
-getSingleUserListing,
+usersGetSingleListingInfoById,
 editListing,
 saveListingForLater,
 deleteListing,
