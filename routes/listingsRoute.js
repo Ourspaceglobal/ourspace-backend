@@ -63,7 +63,7 @@ router
 .route("/get-all-listings-homepage")
 .get(getAllListingForHomepage)
 
-// Get user listings
+// Get single listing info for users
 router
 .route("/get-user-single-listings/:id")
 .get(usersGetSingleListingInfoById)
