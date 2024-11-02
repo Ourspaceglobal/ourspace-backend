@@ -65,7 +65,7 @@ router
 
 // Get user listings
 router
-.route("/get-user-single-listings/:listingId")
+.route("/get-user-single-listings/:id")
 .get(usersGetSingleListingInfoById)
 
 

@@ -784,19 +784,18 @@ const getListingByCategory = asyncHandler(async (req, res) => {
 const usersGetSingleListingInfoById = asyncHandler(async (req, res) => {
   console.log("Fetching a single listing".blue);
 
-  const { listingId } = req.params;
-  console.log("listing id is: ", listingId)
+  const { id } = req.params;
 
   try {
       // console.log(`Searching for listing with ID: ${id}`.yellow);
 
-      const listing = await Listing.findById(listingId);
+      const listing = await Listing.findById(id);
 
       if(!listing) {
-        const draftListing = await DraftListing.findById(listingId)
+        const draftListing = await DraftListing.findById(id)
 
         if(!draftListing) {
-          console.log(`Listing with ID: ${listingId} not found`.red);
+          console.log(`Listing with ID: ${id} not found`.red);
           return res.status(404).json({
               success: false,
               message: "Listing not found",
