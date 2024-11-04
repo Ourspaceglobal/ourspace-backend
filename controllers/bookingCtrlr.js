@@ -93,7 +93,14 @@ export const checkAvailability = asyncHandler(async (req, res) => {
             message: "An error occurred while checking availability",
         });
     }
-});
+}); 
+
+let paystackKey;
+if (process.env.NODE_ENV === "development"){
+    paystackKey = process.env.PAYSTACK_TEST_SECRET_KEY
+} else {
+    paystackKey = process.env.PAYSTACK_LIVE_SECRET_KEY
+}
 
 export const initializeTransaction = asyncHandler(async (req, res) => {
     console.log("Initializing Paystack payment...".green);
@@ -178,7 +185,7 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
             },
             {
                 headers: {
-                    Authorization: `Bearer ${process.env.PAYSTACK_LIVE_SECRET_KEY}`,
+                    Authorization: `Bearer ${paystackKey}`,
                     'Content-Type': 'application/json',
                 },
             }
@@ -193,14 +200,14 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
             listing: listingId,
             spaceOwnerId: listing.user._id,
             paymentType: "paystack",
-            paymentStatus: "pending",
+            paymentStatus: "payment-pending",
             paystackRef: reference,
             paystackAccessCode: access_code,
             paystackReference: reference,
             paystackPaymentStatus: "pending",
             firstName,
             lastName,
-            email,
+            email, 
             phoneNumber,
             bookingForSomeone,
             bookedDays: uniqueBookedDays,
