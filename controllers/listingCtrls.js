@@ -685,7 +685,14 @@ const soGetAllListings = asyncHandler(async (req, res) => {
       const listings = await Listing.find({user: req.user._id});
       const draftListings = await DraftListing.find({user: req.user._id})
 
-      const allListings = [...listings, ...draftListings];
+      const allListings = [...listings, ...draftListings].map((listing) => {
+        // Check for missing propertyName and set default if missing
+        if (!listing.propertyName || listing.propertyName.trim() === "") {
+            listing.propertyName = "Invalid-name";
+        }
+        return listing;
+    });
+
 
       console.log(`Total of ${allListings.length} listings fetched`.magenta);
 

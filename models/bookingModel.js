@@ -14,6 +14,7 @@ const bookingSchema = new mongoose.Schema({
     paymentType: {
         type: String,
         enum: ["paystack", "wallet"],
+        default: "paystack",
         required: true
     },
     spaceOwnerId: {

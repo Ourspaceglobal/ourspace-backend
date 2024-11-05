@@ -726,26 +726,55 @@ export const cancelBooking = asyncHandler(async(req, res)=> {
     }
 })
 
-export const getBookingsForListingId = asyncHandler(async (req, res) => {
+export const spaceOwnerFetchBookingHistoryForALisitng = asyncHandler(async (req, res) => {
     const { listingId } = req.params;
-  
+    const { bookingStatus } = req.body;
+
+    // Construct filter object with listing ID and optional booking status
+    let filter = { listing: listingId, paymentStatus: "completed" };
+    if (bookingStatus) {
+        filter.bookingStatus = bookingStatus;
+    }
+
     try {
-        console.log(`Fetching booking history for specific listing`.blue);
-  
-        const bookings = await Booking.find({ listing: listingId })
-            .populate('user', 'name')
+        console.log(`Fetching booking history for specific listing`.yellow);
+
+        // Fetch bookings based on filter
+        const bookings = await Booking.find(filter)
+            .populate('user')
+            .populate('listing')
             .sort({ date: -1 });
-  
-        console.log(`Booking history retrieved for listing ID: ${listingId}`.green);
-  
+
+        const currentDate = new Date();
+
+        // Update booking status to "completed" if all dates in `bookedDays` have passed
+        await Promise.all(
+            bookings.map(async (booking) => {
+                const allDatesPassed = booking.bookedDays.every(bookedDate => new Date(bookedDate) < currentDate);
+
+                if (allDatesPassed && booking.bookingStatus !== "completed") {
+                    console.log("Changing booking status to completed".blue)
+                    booking.bookingStatus = "completed";
+                    await booking.save(); // Save the status update
+                }
+            })
+        );
+
+        // Format bookings for response
         const formattedBookings = bookings.map(booking => ({
-            date: booking.date,
-            description: booking.description,
-            guestName: booking.user.name,
-            nightsSpent: booking.nightsSpent,
-            amountPaid: booking.amountPaid,
+            id: booking._id,
+            invoiceId: booking.invoiceId,
+            date: formatDate(booking.updatedAt),
+            description: `${booking.listing.propertyId} - ${booking.listing.propertyName}`,
+            guestName: `${booking.user.firstName} ${booking.user.lastName}`,
+            totalNights: booking.totalNight,
+            amountPaid: booking.totalIncuredChargeAfterDiscount,
+            bookingStatus: booking.bookingStatus,
+            paymentStatus: booking.paymentStatus,
+            bookedDays: booking.bookedDays
         }));
-  
+
+        console.log(`Booking history retrieved successfully by space owner`.cyan);
         res.status(200).json({
             success: true,
             message: "Booking history retrieved successfully",
@@ -761,4 +790,38 @@ export const getBookingsForListingId = asyncHandler(async (req, res) => {
         });
     }
 });
- 
+
+// export const updatePaymentStatusForAllBookings = asyncHandler(async (req, res) => {
+//     try {
+//         console.log("Updating payment status for all bookings based on paystack payment status".yellow);
+
+//         // Find all bookings in the database
+//         const bookings = await Booking.find();
+
+//         // Iterate over each booking and update paymentStatus based on paystackPaymentStatus
+//         await Promise.all(
+//             bookings.map(async (booking) => {
+//                 if (booking.paystackPaymentStatus === "success") {
+//                     booking.paymentStatus = "completed";
+//                     await booking.save();
+//                 } else if (booking.paystackPaymentStatus === "pending") {
+//                     booking.paymentStatus = "payment-pending";
+//                     await booking.save();
+//                 }
+//             })
+//         );
+
+//         console.log("Payment status updated for all relevant bookings".green);
+//         return res.status(200).json({
+//             success: true,
+//             message: "Payment status updated for all bookings",
+//         });
+//     } catch (error) {
+//         console.error("Error updating payment status for bookings:", error);
+//         return res.status(500).json({
+//             success: false,
+//             message: "An error occurred while updating payment status for bookings",
+//             error: error.message,
+//         });
+//     }
+// });
