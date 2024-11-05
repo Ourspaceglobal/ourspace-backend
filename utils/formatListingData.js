@@ -19,7 +19,6 @@ export const formatListingData = (req) => {
 
   return {
     user: req.body.user,
-    listedOnOtherPlatform: req.body.listedOnOtherPlatform,
     propertyName: req.body.propertyName,
     propertyType: Array.isArray(req.body.propertyType)
       ? req.body.propertyType.map(type => type.trim().toLowerCase())
@@ -145,7 +144,6 @@ export const formatSaveForLaterListingData = (req) => {
 
   // Only add fields that are present in the request
   if (req.body.user) formattedData.user = req.body.user;
-  if (req.body.listedOnOtherPlatform) formattedData.listedOnOtherPlatform = req.body.listedOnOtherPlatform;
   if (req.body.propertyName) formattedData.propertyName = req.body.propertyName;
   if (req.body.propertyType) {
     formattedData.propertyType = Array.isArray(req.body.propertyType)

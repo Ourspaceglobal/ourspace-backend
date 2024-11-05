@@ -32,7 +32,7 @@ router
 
 // Create listing
 router
-.route('/create-listings')
+.route('/create-listings') 
 .post(protect, upload.fields([
 { name: 'bedroomPictures', maxCount: 10 },
 { name: 'livingRoomPictures', maxCount: 10 },
