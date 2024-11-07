@@ -5,7 +5,7 @@ import {
     editProfileInfo,
     editUserAccountStatus,
     getAllUsers,
-    getUserById
+    getUserData
  } from "../../controllers/adminCtrls/usersAdminC.js";
 
 const router = express.Router()
@@ -16,7 +16,7 @@ router
 
 router
 .route("/:id")
-.get(protect, admin, getUserById)
+.get(protect, admin, getUserData)
 
 router
 .route("/edit-account-status/:id")

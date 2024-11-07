@@ -503,12 +503,74 @@ const postmanSendMessage = asyncHandler(async (req, res) => {
   }
 });
 
+const chatWithSpaceOwner = asyncHandler(async (req, res) => {
+  console.log("Chat with space owner before booking".yellow);
+
+  const user = req.user;
+  const { listingId } = req.body;
+
+  try {
+      // Check if the listing exists and populate the owner
+      const listing = await Listing.findById(listingId).populate("user");
+      if (!listing) {
+          console.log("This listing is currently not available for messaging".red);
+          return res.status(404).json({
+              success: false,
+              message: "This listing is currently not available for messaging"
+          });
+      }
+
+      console.log(`ListingId: ${listing._id}, \nSenderId: ${user._id} \nReceiverId: ${listing.user._id}`.cyan);
+
+      // Check if an existing chat between the user and the listing owner already exists for this listing
+      const existingChat = await Message.findOne({
+          sender: user._id,
+          receiver: listing.user._id,
+          listing: listing._id
+      });
+
+      if (existingChat) {
+          console.log("Chat already exists between the space user and owner for this listing.".blue);
+          return res.status(200).json({
+              success: true,
+              message: "Chat already exists",
+              chat: existingChat // Return existing chat if it exists
+          });
+      }
+
+      // If no existing chat, create a new chat message
+      const newChat = await Message.create({
+          sender: user._id,
+          receiver: listing.user._id,
+          listing: listing._id,
+          content: `New discussion on ${listing.propertyName} at ${listing.propertyLocation.city}`
+      });
+
+      console.log("New chat created between space user and owner.".green);
+      return res.status(201).json({
+          success: true,
+          message: "New chat created",
+          chat: newChat // Return newly created chat
+      });
+
+  } catch (error) {
+      console.error("Error initiating chat:", error);
+      return res.status(500).json({
+          success: false,
+          message: "An error occurred while trying to initiate chat",
+          error: error.message
+      });
+  }
+});
+
+
 
 export { 
   sendMessage, 
   spaceOwnerGetAllChats,
   spaceUserGetAllChats,
   getMessagesForAListing,
-  postmanSendMessage
+  postmanSendMessage,
+  chatWithSpaceOwner
 };
 

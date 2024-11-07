@@ -43,7 +43,7 @@ router
 ]), createListing);
 
 router
-.route("/search")
+.route("/search") 
 .post(searchListings)
 
 router
@@ -52,7 +52,7 @@ router
 
 router
 .route("/get-user-listings")
-.get(protect, soGetAllListings)
+.post(protect, soGetAllListings)
 
 router
 .route("/so-get-single-listing-by-id/:listingId")

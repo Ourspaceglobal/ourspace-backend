@@ -1,6 +1,6 @@
 import pdf from 'html-pdf';
 import { generateBookingPDFHtml, generateWithdrawalPDFHtml } from "../email_templates/invoicePdf.js";
-
+import { format, parseISO } from 'date-fns';
 
 // Function to format the date
 export const formatDate = (date) => {
@@ -11,6 +11,13 @@ export const formatDate = (date) => {
       hour: 'numeric',  // e.g. "10"
       minute: 'numeric', // e.g. "23"
       hour12: true  // e.g. "10:23 AM"
+    });
+};
+export const formatDateForSUTransactionHistory = (date) => {
+    return new Date(date).toLocaleString('en-US', {
+      month: 'short',  // e.g. "Aug"
+      day: 'numeric',  // e.g. "16"
+      year: 'numeric', // e.g. "2022"
     });
 };
 
@@ -25,6 +32,24 @@ export const formatDateWithoutTime = (date) => {
       // hour12: true // Remove this line if you don't want AM/PM
     });
 };
+
+export const formatBookedDays = (bookedDays) => {
+    if (bookedDays.length < 1) return "";
+
+    const startDate = parseISO(bookedDays[0]);
+    const endDate = parseISO(bookedDays[bookedDays.length - 1]);
+
+    // Format each date using 'E. MMM d, yyyy' pattern
+    const startDateFormatted = format(startDate, "EEE. MMM d, yyyy");
+    const endDateFormatted = format(endDate, "EEE. MMM d, yyyy");
+
+    return `${startDateFormatted} - ${endDateFormatted}`;
+};
+
+// Example usage
+const bookedDays = ["2024-11-24", "2024-11-26"];
+const formattedRange = formatBookedDays(bookedDays);
+console.log(formattedRange);  // Output: "Sun. Nov 24, 2024 - Tue. Nov 26, 2024"
   
 // Function to format the amount with commas
 export const formatAmount = (amount) => {

@@ -670,40 +670,64 @@ const filterListings = asyncHandler(async (req, res) => {
 // @route   GET /api/v1/listings
 // @access  Public
 const soGetAllListings = asyncHandler(async (req, res) => {
-  
+  const { listingStatus } = req.body;
+  console.log("Listing status: ", listingStatus);
+
+  // Allowed listing statuses
+  const allowedStatuses = [
+      "approved", "rejected", "active", "inactive", 
+      "pending", "draft", "saved", 
+      "marked-unavailable", "blocked"
+  ];
+
+  // Check if the provided listingStatus is valid
+  if (listingStatus && !allowedStatuses.includes(listingStatus)) {
+      console.log("Invalid listing status provided".red);
+      return res.status(400).json({
+          success: false,
+          message: "Invalid listing status provided. Allowed statuses are: " + allowedStatuses.join(", "),
+      });
+  }
+
   try {
       console.log("Fetching user listings".blue);
 
-      // Find listings based on the query object
-      if(req.user.userType !== "space-owner") {
-        console.log("Only space owner is allowed".red)
-        return res.status(500).json({
-          success: false,
-          message: "Only space owners are allowed"
-        })
+      // Ensure only space owners can access this route
+      if (req.user.userType !== "space-owner") {
+          console.log("Only space owner is allowed".red);
+          return res.status(403).json({
+              success: false,
+              message: "Only space owners are allowed",
+          });
       }
-      const listings = await Listing.find({user: req.user._id});
-      const draftListings = await DraftListing.find({user: req.user._id})
 
+      // Construct filter object based on listing status and user
+      let filter = { user: req.user._id };
+      if (listingStatus) filter.listingStatus = listingStatus;
+
+      // Fetch listings
+      const listings = await Listing.find(filter);
+      const draftListings = await DraftListing.find(filter);
+
+      // Combine and format listings
       const allListings = [...listings, ...draftListings].map((listing) => {
-        // Check for missing propertyName and set default if missing
-        if (!listing.propertyName || listing.propertyName.trim() === "") {
-            listing.propertyName = "Invalid-name";
-        }
-        return listing;
-    });
-
+          // Set default name if propertyName is missing
+          if (!listing.propertyName || listing.propertyName.trim() === "") {
+              listing.propertyName = "Invalid-name";
+          }
+          return listing;
+      });
 
       console.log(`Total of ${allListings.length} listings fetched`.magenta);
 
       res.status(200).json({
           success: true,
           total: allListings.length,
-          message: 'Listings retrieved successfully',
+          message: "Listings retrieved successfully",
           data: allListings,
       });
   } catch (error) {
-      console.error('Error fetching user listings:', error);
+      console.error("Error fetching user listings:", error);
       res.status(500).json({
           success: false,
           message: `Server error: ${error.message}`,

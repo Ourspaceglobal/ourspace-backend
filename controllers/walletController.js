@@ -2,7 +2,7 @@ import axios from "axios";
 import asyncHandler from "../middleware/asyncHandler.js";
 import Booking from "../models/bookingModel.js";
 import Wallet from "../models/walletModel.js";
-import { formatAmount, formatDate, formatDateWithoutTime, generateBookingInvoicePDF, generateWithdrawalInvoicePDF } from "../utils/helperFunction.js";
+import { formatAmount, formatDate, formatDateForSUTransactionHistory, formatDateWithoutTime, generateBookingInvoicePDF, generateWithdrawalInvoicePDF } from "../utils/helperFunction.js";
 import BankDetails from "../models/bankModel.js";
 import User from "../models/userModel.js";
 import Withdrawal from "../models/withdrawalRequestModel.js";
@@ -26,7 +26,7 @@ export const spaceOwnerGetWallet = asyncHandler(async (req, res) => {
         // Fetch bookings and populate related models (listing and user)
         const bookings = await Booking.find({ 
             spaceOwnerId: req.user._id,
-            paystackPaymentStatus: "success"
+            paymentStatus: "completed"
          })
             .populate('listing')
             .populate('user').sort({updatedAt: -1});
@@ -646,75 +646,124 @@ export const spaceUserGetWallet = asyncHandler(async(req, res) => {
 
 export const getTransactionsForSpaceUsersWallet = asyncHandler(async (req, res) => {
     console.log("Getting transaction history for space users".blue);
-
-    const { paystackPaymentStatus } = req.query;
     const user_id = req.user._id; 
 
-    if ( paystackPaymentStatus && !["pending", "success", "failed"].includes(paystackPaymentStatus)) {
-        console.log("Invalid payment status".red);
-        return res.status(400).json({
-            success: false,
-            message: "Invalid or missing payment status"
-        });
-    }
-
-    let filter = { user: user_id };
-
-    if (paystackPaymentStatus) {
-        filter.paystackPaymentStatus = paystackPaymentStatus;
-    }
-
     try {
-        const bookings = await Booking.find(filter)
-            .populate("listing")
-            .sort({ updatedAt: -1 });
+        const bookings = await Booking.find({ user: user_id }).sort({ updatedAt: -1 });
 
         // Format booking data
         const formattedBookings = bookings.map((booking) => ({
             id: booking._id,
-            propertyName: booking.listing?.propertyName || 'N/A',
-            propertyType: booking.listing?.propertyType[0] || 'N/A',
-            propertyImage: booking.listing?.bedroomPictures[0]?.secure_url || 'N/A',
-            date: formatDate(booking.createdAt),
+            invoiceId: booking.invoiceId,
+            date: formatDateForSUTransactionHistory(booking.updatedAt),  
+            description: "Booking",
             amount: booking.chargePerNight + 2000,
+            paymentMethod: booking.paymentType,
             paymentStatus: booking.paystackPaymentStatus
         }));
 
-        const fundinghistory = await FundingHistory.find({user: req.user._id})
+        const fundinghistory = await FundingHistory.find({ user: req.user._id }).sort({ updatedAt: -1 });
 
         const formattedFundingHistory = fundinghistory.map((funding) => ({
             id: funding._id,
-            propertyImage: funding.display_image,
-            propertyName: "Wallet funding",
-            propertyType: funding.mode_of_funding,
-            date: formatDate(funding.createdAt),
+            invoiceId: funding.invoiceId,
+            date: formatDateForSUTransactionHistory(funding.updatedAt),
+            description: "Wallet funding",
             amount: funding.amount_to_fund,
+            paymentMethod: funding.mode_of_funding,
             paymentStatus: funding.payment_status
-        }))
+        }));
 
-        console.log("History", formattedFundingHistory)
+        // Combine and sort by `updatedAt` field using the raw data
+        const formattedResponse = formattedBookings.concat(formattedFundingHistory)
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        const formattedResponse = formattedBookings.concat(formattedFundingHistory).sort((a, b) => new Date(b.date)- new Date(a.date))
+        console.log(`Bookings total: ${bookings.length}`);
+        console.log(`Fundings total: ${fundinghistory.length}`);
+        console.log(`Transactions retrieved successfully`.green);
 
-        console.log(`Bookings total: ${bookings.length}`)
-        console.log(`Fundings total: ${fundinghistory.length}`)
-        console.log(`Bookings retrieved successfully`.green);
         return res.status(200).json({
             success: true,
-            message: "Bookings retrieved successfully",
+            message: "Wallet transactions successfully retrieved",
             totalBookings: formattedBookings.length,
             data: formattedResponse
         });
 
     } catch (error) {
-        console.error("Error retrieving bookings: ", error);
+        console.error("Error retrieving transactions: ", error);
         return res.status(500).json({
             success: false,
-            message: "An error occurred while retrieving bookings",
+            message: "An error occurred while retrieving transactions",
             error: error.message
         });
     }
 });
+
+export const spaceUserGetSingleTransactionDetails = asyncHandler(async (req, res) => {
+    console.log("Getting a single wallet transaction details for space user".green);
+
+    try {
+        const { transactionId } = req.query;
+
+        console.log(`Transaction ID: ${transactionId}`.blue);
+
+        const booking = await Booking.findById(transactionId).populate("listing")
+
+        if(!booking) {
+            console.log("Not found in booking, looking through funding".yellow)
+
+            const funding = await FundingHistory.findById(transactionId)
+
+            if(!funding) {
+                console.log("Transaction does not exist".red)
+                return res.status(200).json({
+                    success: true,
+                    message: "No transaction found"
+                })
+            }
+
+            const formattedTransaction = {
+                invoiceId: funding.invoiceId,
+                date: formatDate(funding.updatedAt),
+                paymentMethod: funding.paymentMethod,
+                amount: funding.amount_to_fund,
+            }
+
+            console.log("Transaction retrieved successfully".cyan)
+            return res.status(200).json({
+                success: true,
+                message: "Transaction successfully retrieved",
+                data: formattedTransaction
+            })
+
+        }
+
+        const formattedBookingTransaction = {
+            invoiceId: booking.invoiceId,
+            date: formatDate(booking.updatedAt),
+            propertyName: booking.listing.propertyName,
+            paymentMethod: booking.paymentType,
+            amount: booking.totalIncuredChargeAfterDiscount,
+            totalNights: booking.totalNight,
+        }
+
+        console.log("Transaction retrieved successfully".cyan)
+        return res.status(200).json({
+            success: true,
+            message: "Transaction successfully retrieved",
+            data: formattedBookingTransaction
+        })
+
+    } catch (error) {
+        console.error("Error fetching transaction details:", error);
+        res.status(500).json({
+            success: false,
+            message: "An error occurred while fetching transaction details",
+            error: error.message
+        });
+    }
+});
+
 
 export const spaceUserInitialiseFundWallet = async (req, res) => {
     console.log("Initializing Paystack payment for wallet funding...".green);

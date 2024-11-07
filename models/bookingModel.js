@@ -13,15 +13,15 @@ const bookingSchema = new mongoose.Schema({
     },
     paymentType: {
         type: String,
-        enum: ["paystack", "wallet"],
-        default: "paystack",
+        enum: ["paystack", "wallet", "bank-payment"],
+        default: "bank-payment",
         required: true
     },
     spaceOwnerId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
       },
-      invoiceId: { 
+    invoiceId: { 
         type: String, 
         default: null, 
         unique: true 
@@ -137,9 +137,10 @@ bookingSchema.pre('save', async function (next) {
 
 function generateInvoiceId() {
   const randomDigits = Array.from({ length: 8 }, () => Math.floor(Math.random() * 10)).join('');
-  return `#${randomDigits}`;
+  return `B${randomDigits}`;
 }
 
 const Booking = mongoose.model('Booking', bookingSchema);
 
 export default Booking;
+

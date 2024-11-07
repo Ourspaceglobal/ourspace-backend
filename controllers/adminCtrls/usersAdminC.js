@@ -1,5 +1,10 @@
 import asyncHandler from "../../middleware/asyncHandler.js"
+import Booking from "../../models/bookingModel.js";
+import FundingHistory from "../../models/fundingModel.js";
 import User from "../../models/userModel.js"
+import Wallet from "../../models/walletModel.js";
+import Withdrawal from "../../models/withdrawalRequestModel.js";
+import { formatDate } from "../../utils/helperFunction.js";
 
 const getAllUsers = asyncHandler(async (req, res) => {
     console.log("Getting all users...".yellow);
@@ -24,12 +29,24 @@ const getAllUsers = asyncHandler(async (req, res) => {
 
     try {
         const users = await User.find(filter);
+
+        const formattedUsers = users.map((user) => ({
+            id: user._id,
+            email: user.email,
+            type: user.userType,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            phoneNumber: user.phoneNumber,
+            status: "active",
+            date: formatDate(user.createdAt)
+        }))
+
         console.log(`Total of ${users.length} users successfully retrieved`.america);
         res.status(200).json({
             success: true,
             message: `Total of ${users.length} users successfully retrieved`,
             total: users.length,
-            data: users
+            data: formattedUsers
         });
 
     } catch (err) {
@@ -41,28 +58,172 @@ const getAllUsers = asyncHandler(async (req, res) => {
     }
 });
 
-const getUserById = asyncHandler(async (req, res) => {
+const getUserData = asyncHandler(async (req, res) => {
     const userId = req.params.id;
+    const { filter, walletTab } = req.query; // `walletTab` for wallet-specific sub-filters
 
-    console.log(`Getting user with ID ${userId}`.blue);
+    console.log(`Fetching data for user ID ${userId} with filter ${filter}`.yellow);
 
-    const user = await User.findById(userId);
-    
-    if (!user) {
-        console.log(`User not retrieved`.red);
-        res.status(404).json({
+    let spaceOwner;
+
+    try {
+        // User info filter
+        if (!filter || filter === 'user-info') {
+            spaceOwner = await User.findById(userId);
+            if (!spaceOwner) {
+                console.log("No user found".red);
+                return res.status(404).json({
+                    success: false,
+                    message: "User not found",
+                });
+            }
+
+            console.log("User successfully retrieved".rainbow);
+            return res.status(200).json({
+                success: true,
+                message: "User info retrieved successfully",
+                data: spaceOwner,
+            });
+        }
+
+        // Bookings filter
+        if (filter === 'bookings') {
+            const bookings = await Booking.find({ user: userId }).populate('listing').populate('user').sort({ updatedAt: -1 });
+            if (bookings.length < 1) {
+                console.log("No booking found at the moment".red);
+                return res.status(200).json({
+                    success: true,
+                    message: "No booking history found at the moment",
+                    data: bookings
+                });
+            }
+
+            const spaceOwner = await User.findById(userId)
+
+            console.log("Space-owner", spaceOwner)
+
+            
+
+            const formattedBookings = bookings.map((booking) => {
+                const listing = booking.listing || {};
+                return {
+                    id: booking._id,
+                    invoiceId: booking.invoiceId,
+                    spaceOwnerName: spaceOwner.firstName,
+                    spaceUserName: booking.user?.lastName || 'N/A',
+                    spaceName: listing.propertyName || "Unknown Property",
+                    status: booking.paymentStatus,
+                    amount: booking.totalIncuredChargeAfterDiscount,
+                    date: formatDate(booking.updatedAt),
+                };
+            });
+
+            console.log("Bookings successfully retrieved for a user by admin".rainbow);
+            return res.status(200).json({
+                success: true,
+                message: "User bookings retrieved successfully",
+                total: bookings.length,
+                data: formattedBookings,
+            });
+        }
+
+        // Wallet filter
+        if (filter === 'wallet') {
+            const walletBalance = await Wallet.findOne({ user: userId });
+
+            const formattedWalletBalance = {
+                userId: walletBalance.user,
+                currentBalance: walletBalance.currentBalance
+            }
+
+            if (walletTab === 'bookings' || !walletTab) { 
+                console.log(`Fetching data for user ID ${userId} with filter ${filter} under ${walletTab}`.green);
+                const walletBookings = await Booking.find({ user: userId }); // Assuming `WalletMetrics` is your collection for metrics
+                if (walletBookings.length < 1) {
+                    console.log("No bookings found at the moment".red);
+                    return res.status(200).json({
+                        success: true,
+                        message: "No bookings found at the moment",
+                        data: {
+                            walletMetrics: formattedWalletBalance,
+                            bookings: walletBookings
+                        }
+                    });
+                }
+
+                const formattedWalletBookings = walletBookings.map((walletBooking) => ({
+                    id: walletBooking._id,
+                    invoiceId: walletBooking.invoiceId,
+                    date: walletBooking.updatedAt,
+                    description: "Booking",
+                    amount: walletBooking.totalIncuredChargeAfterDiscount,
+                    paymentMethod: walletBooking.paymentType,
+                    paymentStatus: walletBooking.paymentStatus
+                }))
+
+                console.log("Wallet dashboard successfully retrieved for a user by admin".rainbow);
+                return res.status(200).json({
+                    success: true,
+                    message: "Wallet dashboard retrieved successfully",
+                    data: {
+                        walletMetrics: formattedWalletBalance,
+                        bookings: formattedWalletBookings
+                    }
+                });
+            } else if (walletTab === 'wallet-transactions') {
+                console.log(`Fetching data for user ID ${userId} with filter ${filter} under ${walletTab}`.green);
+                const walletTransactions = await Withdrawal.find({ user: userId }).sort({ updatedAt: -1 });
+
+                if (walletTransactions.length < 1) {
+                    console.log("No wallet transaction history found at the moment".red);
+                    return res.status(200).json({
+                        success: true,
+                        message: "No wallet transaction history found at the moment",
+                        data: walletTransactions
+                    });
+                }
+
+                const formattedTransactions = walletTransactions.map((transaction) => ({
+                    id: transaction._id,
+                    invoiceId: `#${transaction.paystack_id}`,
+                    amount: transaction.amount,
+                    reason: transaction.reason,
+                    status: transaction.status,
+                    date: formatDate(transaction.updatedAt),
+                }));
+
+                console.log("Wallet transaction history successfully retrieved for a user by admin".rainbow);
+                return res.status(200).json({
+                    success: true,
+                    message: "Wallet transactions retrieved successfully",
+                    total: walletTransactions.length,
+                    data: formattedTransactions,
+                });
+            }
+
+            console.log("Invalid wallet tab selected".red);
+            return res.status(400).json({
+                success: false,
+                message: `Invalid wallet tab value.`,
+            });
+        }
+
+        console.log("Invalid filter selected".red);
+        return res.status(400).json({
             success: false,
-            message: `User not retrieved`,
+            message: `Invalid filter value. Use 'user-info', 'bookings', or 'wallet'.`,
+        });
+
+    } catch (error) {
+        console.error("Error retrieving user data:", error);
+        res.status(500).json({
+            success: false,
+            message: "An error occurred while retrieving data",
+            error: error.message,
         });
     }
-
-    console.log(`User successfully retrieved`.america);
-    res.status(200).json({
-        success: true,
-        message: `User successfully retrieved`,
-        data: user
-    });
 });
+
 
 const editProfileInfo = asyncHandler(async (req, res) => {
     console.log("Editing profile information".yellow);
@@ -198,7 +359,7 @@ const deleteUserAccount = asyncHandler(async (req, res) => {
 
 export {
     getAllUsers,
-    getUserById,
+    getUserData,
     editProfileInfo,
     editUserAccountStatus,
     deleteUserAccount

@@ -5,6 +5,7 @@ import Booking from "../models/bookingModel.js"
 import Message from "../models/messageModel.js"
 import Listing from "../models/listingModel.js";
 import DraftListing from "../models/draftListingModel.js";
+import { formatBookedDays } from "../utils/helperFunction.js";
 
 
 const getSpaceUserDashboard = asyncHandler(async (req, res) => {
@@ -107,7 +108,7 @@ const getAllSUBookings = asyncHandler(async (req, res) => {
     let bookings = await Booking.find(filter)
         .populate({
             path: 'listing',
-            select: 'propertyId propertyName propertyLocation livingRoomPictures chargePerNight bedroomTotal totalGuestsAllowed bedTotal bathroomTotal description',
+            select: 'propertyId propertyName propertyLocation livingRoomPictures chargePerNight bedroomTotal totalGuestsAllowed bedTotal bathroomTotal description arrivalDepartureDetails',
         });
 
     if (bookings.length < 1) {
@@ -133,21 +134,31 @@ const getAllSUBookings = asyncHandler(async (req, res) => {
         }
     }
 
-    const formattedBookings = bookings.map(booking => ({
-        id: booking.listing._id, 
-        propertyId: booking.listing.propertyId,
-        propertyName: booking.listing.propertyName,
-        propertyLocation: booking.listing.propertyLocation,
-        bookingStatus: booking.bookingStatus,
-        chargePerNight: booking.listing.chargePerNight,
-        bedroomTotal: booking.listing.bedroomTotal,
-        totalBeds: booking.listing.bedTotal,
-        totalBathroom: booking.listing.bathroomTotal,
-        description: booking.listing.description,
-        totalGuestsAllowed: booking.listing.totalGuestsAllowed,
-        propertyImage: booking.listing.livingRoomPictures[0],
-        timestamp: booking.createdAt,
-    }));
+    const formattedBookings = bookings.map(booking => {
+        const formattedBookedDays = formatBookedDays(booking.bookedDays);
+        
+        return {
+            id: booking.listing._id, 
+            email: req.user.email,
+            propertyId: booking.listing.propertyId,
+            propertyName: booking.listing.propertyName,
+            bookedDays: formattedBookedDays,
+            totalNights: booking.bookedDays.length,
+            totalGuests: booking.totalGuest,
+            checkIn: `${booking.listing.arrivalDepartureDetails.checkIn.from} - ${booking.listing.arrivalDepartureDetails.checkIn.to}`,
+            checkOut: `${booking.listing.arrivalDepartureDetails.checkOut.from} - ${booking.listing.arrivalDepartureDetails.checkOut.to}`,
+            propertyLocation: booking.listing.propertyLocation,
+            bookingStatus: booking.bookingStatus,
+            chargePerNight: booking.listing.chargePerNight,
+            bedroomTotal: booking.listing.bedroomTotal,
+            totalBeds: booking.listing.bedTotal,
+            totalBathroom: booking.listing.bathroomTotal,
+            description: booking.listing.description,
+            propertyImage: booking.listing.livingRoomPictures[0],
+            timestamp: booking.createdAt,
+        };
+    });
+    
 
     console.log(`Total of ${bookings.length} bookings found`.magenta);
     return res.status(200).json({
@@ -252,7 +263,7 @@ const getAllNotifications = asyncHandler(async(req, res)=> {
         })
     }
 })
-
+ 
 //                                                              space owners
 const getSpaceOwnerDashboard = asyncHandler(async (req, res) => {
     console.log("Getting space owner dashboard".yellow);

@@ -790,38 +790,3 @@ export const spaceOwnerFetchBookingHistoryForALisitng = asyncHandler(async (req,
         });
     }
 });
-
-// export const updatePaymentStatusForAllBookings = asyncHandler(async (req, res) => {
-//     try {
-//         console.log("Updating payment status for all bookings based on paystack payment status".yellow);
-
-//         // Find all bookings in the database
-//         const bookings = await Booking.find();
-
-//         // Iterate over each booking and update paymentStatus based on paystackPaymentStatus
-//         await Promise.all(
-//             bookings.map(async (booking) => {
-//                 if (booking.paystackPaymentStatus === "success") {
-//                     booking.paymentStatus = "completed";
-//                     await booking.save();
-//                 } else if (booking.paystackPaymentStatus === "pending") {
-//                     booking.paymentStatus = "payment-pending";
-//                     await booking.save();
-//                 }
-//             })
-//         );
-
-//         console.log("Payment status updated for all relevant bookings".green);
-//         return res.status(200).json({
-//             success: true,
-//             message: "Payment status updated for all bookings",
-//         });
-//     } catch (error) {
-//         console.error("Error updating payment status for bookings:", error);
-//         return res.status(500).json({
-//             success: false,
-//             message: "An error occurred while updating payment status for bookings",
-//             error: error.message,
-//         });
-//     }
-// });
