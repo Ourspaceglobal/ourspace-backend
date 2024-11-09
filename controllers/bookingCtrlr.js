@@ -728,11 +728,12 @@ export const cancelBooking = asyncHandler(async(req, res)=> {
 
 export const spaceOwnerFetchBookingHistoryForALisitng = asyncHandler(async (req, res) => {
     const { listingId } = req.params;
-    const { bookingStatus } = req.body;
+    const { bookingStatus } = req.query;
 
     // Construct filter object with listing ID and optional booking status
     let filter = { listing: listingId, paymentStatus: "completed" };
     if (bookingStatus) {
+        console.log("Booking status", bookingStatus)
         filter.bookingStatus = bookingStatus;
     }
 
