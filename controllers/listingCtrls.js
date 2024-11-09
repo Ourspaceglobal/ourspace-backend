@@ -1011,7 +1011,7 @@ const deleteListing = asyncHandler(async (req, res) => {
   console.log("Deleting listing...".yellow);
 
   const { listingId } = req.body;
-  console.log(`Listing Id: ${req.body}`.cyan)
+  console.log(`Listing Id: ${req.body.listingId}`.cyan)
   const userId = req.user._id.toString();
 
   if (!listingId) {
