@@ -1010,64 +1010,66 @@ const editListing = asyncHandler(async (req, res) => {
 const deleteListing = asyncHandler(async (req, res) => {
   console.log("Deleting listing...".yellow);
 
-  const { listingId } = req.body;
-  console.log(`Listing Id: ${req.body.listingId}`.cyan)
+  const listingId = req.params.listingId; // Access listingId from req.query
+  console.log(`Listing Id: ${listingId}`.cyan);
   const userId = req.user._id.toString();
 
   if (!listingId) {
     console.log("Valid listing Id is required".red);
     return res.status(400).json({
       success: false,
-      message: "Valid listing Id is required"
+      message: "Valid listing Id is required",
     });
-  } 
+  }
 
   try {
-    // I first try finding the listing in the Listing model
+    // Attempt to find the listing in the Listing model first
     let existingListing = await Listing.findById(listingId);
-
-    // If not found, I try finding it in the DraftListing model
     let isDraft = false;
+
+    // If not found in Listing, try finding it in DraftListing
     if (!existingListing) {
       existingListing = await DraftListing.findById(listingId);
-      isDraft = !!existingListing; // I then set isDraft to true if found in DraftListing
+      isDraft = !!existingListing; // Set isDraft to true if found in DraftListing
     }
 
+    // Check if listing exists in either Listing or DraftListing
     if (!existingListing) {
       console.log("Listing selected to be deleted does not exist".red);
       return res.status(404).json({
         success: false,
-        message: "Listing selected to be deleted does not exist"
+        message: "Listing selected to be deleted does not exist",
       });
-    } 
+    }
 
+    // Check if the current user is the owner in both Listing and DraftListing scenarios
     if (existingListing.user.toString() !== userId) {
       console.log("Unauthorized attempt to delete listing".red);
       return res.status(403).json({
         success: false,
-        message: "You are not authorized to delete this listing"
+        message: "You are not authorized to delete this listing",
       });
     }
 
-    // If it is a listing (not a draft), check if there are upcoming bookings
+    // If it's an active listing, check for upcoming bookings
     if (!isDraft) {
       const bookings = await Booking.find({ listing: listingId });
       const currentDate = new Date();
-      for (const booking of bookings) {
-        const hasUpcomingBooking = booking.bookedDays.some(
-          (day) => new Date(day) > currentDate
-        );
 
-        if (hasUpcomingBooking) {
-          console.log("Cannot delete listing, there are upcoming bookings".red);
-          return res.status(400).json({
-            success: false,
-            message: "Cannot delete listing as there are upcoming bookings."
-          });
-        }
+      const hasUpcomingBooking = bookings.some((booking) =>
+        booking.bookedDays.some((day) => new Date(day) > currentDate)
+      );
+
+      if (hasUpcomingBooking) {
+        console.log("Cannot delete listing, there are upcoming bookings".red);
+        return res.status(400).json({
+          success: false,
+          message: "Cannot delete listing as there are upcoming bookings.",
+        });
       }
     }
 
+    // Collect image public IDs for deletion
     const imageCategories = [
       "bedroomPictures",
       "livingRoomPictures",
@@ -1104,16 +1106,17 @@ const deleteListing = asyncHandler(async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Listing successfully deleted"
+      message: "Listing successfully deleted",
     });
   } catch (error) {
     console.error("Error deleting listing", error);
     return res.status(500).json({
       success: false,
-      message: "Error deleting listing"
+      message: "Error deleting listing",
     });
   }
 });
+
 
 function generateInvoiceId() {
   const randomDigits = Array.from({ length: 8 }, () => Math.floor(Math.random() * 10)).join('');

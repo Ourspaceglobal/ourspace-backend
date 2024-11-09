@@ -55,6 +55,10 @@ router
 .post(protect, soGetAllListings)
 
 router
+.route("/delete-listing-or-draft/:listingId")
+.delete(protect, deleteListing)
+
+router
 .route("/so-get-single-listing-by-id/:listingId")
 .get(protect, soGetSingleListingById)
 
@@ -84,9 +88,7 @@ router
     { name: 'otherPictures', maxCount: 10 }
   ]), editListing);
 
-router
-.route("/delete-listing-or-draft")
-.delete(protect, deleteListing)
+
 
 // Temporary
 router
