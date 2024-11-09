@@ -1011,7 +1011,7 @@ const deleteListing = asyncHandler(async (req, res) => {
   console.log("Deleting listing...".yellow);
 
   const { listingId } = req.body;
-  console.log(`Listing Id: ${listingId}`.cyan)
+  console.log(`Listing Id: ${req.body}`.cyan)
   const userId = req.user._id.toString();
 
   if (!listingId) {
@@ -1039,7 +1039,7 @@ const deleteListing = asyncHandler(async (req, res) => {
         success: false,
         message: "Listing selected to be deleted does not exist"
       });
-    }
+    } 
 
     if (existingListing.user.toString() !== userId) {
       console.log("Unauthorized attempt to delete listing".red);
