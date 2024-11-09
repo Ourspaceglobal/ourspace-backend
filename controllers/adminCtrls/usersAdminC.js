@@ -355,12 +355,76 @@ const deleteUserAccount = asyncHandler(async (req, res) => {
     }
 });
 
-
-
+const adminChangeUserRole = asyncHandler(async (req, res) => {
+    console.log("Admin changing user role".cyan);
+  
+    const { userId, newRole } = req.body;
+  
+    try {
+      // Check if the current user is an admin
+      if (!req.user.isAdmin) {
+        console.log("Only admins can change user roles".red);
+        return res.status(401).json({
+          success: false,
+          message: "Only admins can change user roles",
+        });
+      }
+  
+      // Ensure that the `newRole` is valid
+      const validRoles = ["user", "admin", "super-admin"];
+      if (!validRoles.includes(newRole)) {
+        console.log("Invalid role provided".red);
+        return res.status(400).json({
+          success: false,
+          message: "Invalid role. Role must be one of: user, admin, super-admin",
+        });
+      }
+  
+      // Find the user whose role needs to be changed
+      const existingUser = await User.findById(userId);
+      if (!existingUser) {
+        console.log("The user for which the role is to be changed does not exist".red);
+        return res.status(404).json({
+          success: false,
+          message: "The user for which the role is to be changed does not exist",
+        });
+      }
+  
+      // Update the user's role and isAdmin status based on newRole
+      if (newRole === "user") {
+        existingUser.isAdmin = false;
+      } else {
+        existingUser.isAdmin = true;
+      }
+      existingUser.role = newRole;
+  
+      await existingUser.save();
+  
+      console.log(`User role changed successfully to ${newRole}`.green);
+      return res.status(200).json({
+        success: true,
+        message: `User role updated to ${newRole}`,
+        data: {
+          userId: existingUser._id,
+          newRole: existingUser.role,
+        },
+      });
+    } catch (error) {
+      console.error("Error changing user role:", error);
+      return res.status(500).json({
+        success: false,
+        message: "An error occurred while changing the user role",
+        error: error.message,
+      });
+    }
+  });
+  
+  
 export {
     getAllUsers,
     getUserData,
     editProfileInfo,
     editUserAccountStatus,
-    deleteUserAccount
+    deleteUserAccount,
+    adminChangeUserRole
 }

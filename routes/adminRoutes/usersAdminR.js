@@ -1,6 +1,7 @@
 import express from "express";
-import { protect, admin } from "../../middleware/authMiddleware.js";
+import { protect, admin, superAdmin } from "../../middleware/authMiddleware.js";
 import { 
+    adminChangeUserRole,
     deleteUserAccount,
     editProfileInfo,
     editUserAccountStatus,
@@ -29,6 +30,10 @@ router
 router
 .route("/delete-user-account/:id")
 .delete(protect, admin, deleteUserAccount)
+
+router
+.route("/change-user-role")
+.patch(protect, admin, superAdmin, adminChangeUserRole)
 
 export default router
 

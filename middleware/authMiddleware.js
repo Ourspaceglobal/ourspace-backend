@@ -55,6 +55,16 @@ const admin = (req, res, next) => {
   }
 };
 
+const superAdmin = (req, res, next) => {
+  if (req.user && req.user.isAdmin && req.user.role === "super-user") {
+    next();
+  } else {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied, yes you are an admin, but access for this fundtion is only available for super admins'
+    });
+  }
+};
 
 const localVariables = (req, res, next) => {
   req.app.locals = {
@@ -64,4 +74,4 @@ const localVariables = (req, res, next) => {
   next();
 };
 
-export { protect, admin, localVariables };
+export { protect, admin, superAdmin, localVariables };
