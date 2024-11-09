@@ -17,6 +17,6 @@ router
 
 router
 .route("/specific-listing-bookings/:listingId")
-.get(protect, spaceOwnerFetchBookingHistoryForALisitng)
+.post(protect, spaceOwnerFetchBookingHistoryForALisitng)
 
 export default router 
