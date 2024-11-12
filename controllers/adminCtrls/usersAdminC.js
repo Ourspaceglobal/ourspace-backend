@@ -133,19 +133,21 @@ const getUserData = asyncHandler(async (req, res) => {
 
             const formattedWalletBalance = {
                 userId: walletBalance.user,
-                currentBalance: walletBalance.currentBalance
+                availableBalance: walletBalance.currentBalance,
+                totalEarning: walletBalance.totalEarned
             }
 
             if (walletTab === 'bookings' || !walletTab) { 
                 console.log(`Fetching data for user ID ${userId} with filter ${filter} under ${walletTab}`.green);
-                const walletBookings = await Booking.find({ user: userId }); // Assuming `WalletMetrics` is your collection for metrics
+                const walletBookings = await Booking.find({ user: userId });
+
                 if (walletBookings.length < 1) {
                     console.log("No bookings found at the moment".red);
                     return res.status(200).json({
                         success: true,
                         message: "No bookings found at the moment",
                         data: {
-                            walletMetrics: formattedWalletBalance,
+                            wallet: formattedWalletBalance,
                             bookings: walletBookings
                         }
                     });
@@ -166,39 +168,83 @@ const getUserData = asyncHandler(async (req, res) => {
                     success: true,
                     message: "Wallet dashboard retrieved successfully",
                     data: {
-                        walletMetrics: formattedWalletBalance,
                         bookings: formattedWalletBookings
                     }
                 });
             } else if (walletTab === 'wallet-transactions') {
                 console.log(`Fetching data for user ID ${userId} with filter ${filter} under ${walletTab}`.green);
-                const walletTransactions = await Withdrawal.find({ user: userId }).sort({ updatedAt: -1 });
+            
+                // Fetch wallet transactions and bookings with completed payment status
+                const walletTransactions = await Withdrawal.find({ user: userId }).sort({ createdAt: -1 });
+                const fundinghistory = await FundingHistory.find({ user: userId }).sort({ createdAt: -1 })
+                const SUBookings = await Booking.find({ user: userId, paymentStatus: "completed" }).populate("listing").sort({ createdAt: -1 });
+                const SOBookings = await Booking.find({ spaceOwnerId: userId, paymentStatus: "completed" }).populate("listing").sort({ createdAt: -1 });
 
-                if (walletTransactions.length < 1) {
-                    console.log("No wallet transaction history found at the moment".red);
+            
+                // If no wallet transactions and no bookings, return early
+                if (walletTransactions.length < 1 && SUBookings.length < 1 && SOBookings.length < 1 && fundinghistory.length < 1) {
+                    console.log("No wallet transactions or bookings found at the moment".red);
                     return res.status(200).json({
                         success: true,
-                        message: "No wallet transaction history found at the moment",
-                        data: walletTransactions
+                        message: "No wallet transactions or bookings found at the moment",
+                        data: [],
                     });
                 }
-
-                const formattedTransactions = walletTransactions.map((transaction) => ({
+            
+                // Format wallet transactions FOR SPACE OWNERS WITHDRAWAL
+                const formattedWalletTransactions = walletTransactions.map((transaction) => ({
+                    type: 'debit',
+                    reason: "wallet-withdrawal",
                     id: transaction._id,
                     invoiceId: `#${transaction.paystack_id}`,
                     amount: transaction.amount,
-                    reason: transaction.reason,
-                    status: transaction.status,
-                    date: formatDate(transaction.updatedAt),
+                    date: formatDate(transaction.createdAt),
+                }));
+            
+                // Format funbding history for space users 
+                const formattedFundingHistory = fundinghistory.map((funding) => ({
+                    type: 'credit',
+                    reason: "wallet-funding",
+                    id: funding._id,
+                    invoiceId: `#${funding.invoiceId}`,
+                    amount: funding.amount_to_fund,
+                    date: formatDate(funding.createdAt),
+                }));
+                
+                // Format bookings for space user 
+                const formattedSUBookings = SUBookings.map((booking) => ({
+                    type: 'credit',
+                    reason: "Payment SU makes for property Bookings",
+                    id: booking._id,
+                    invoiceId: booking.invoiceId,
+                    amount: booking.totalIncuredChargeAfterDiscount * booking.bookedDays.length,
+                    date: formatDate(booking.createdAt),
                 }));
 
-                console.log("Wallet transaction history successfully retrieved for a user by admin".rainbow);
+                // Bookings for space owners for their listing paid by space users
+                const formattedSOBookings = SOBookings.map((booking) => ({
+                    type: 'credit',
+                    reason: "SU Bookings payment",
+                    id: booking._id,
+                    invoiceId: booking.invoiceId,
+                    amount: booking.totalIncuredChargeAfterDiscount * booking.bookedDays.length,
+                    date: formatDate(booking.createdAt),
+                }));
+
+            
+                // Combine both formatted transactions and bookings
+                const combinedData = [...formattedWalletTransactions, ...formattedSUBookings, ...formattedSOBookings, ...formattedFundingHistory];
+            
+                // Sort the combined data by 'date' (createdAt) in descending order
+                const sortedCombinedData = combinedData.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+                console.log(`Total of ${sortedCombinedData} wallet transaction history and bookings successfully retrieved for the user`.rainbow);
                 return res.status(200).json({
                     success: true,
-                    message: "Wallet transactions retrieved successfully",
-                    total: walletTransactions.length,
-                    data: formattedTransactions,
-                });
+                    message: "Wallet transactions and bookings retrieved successfully",
+                    total: sortedCombinedData.length,
+                    data: sortedCombinedData,
+                });            
             }
 
             console.log("Invalid wallet tab selected".red);

@@ -89,7 +89,7 @@ const getAllSUBookings = asyncHandler(async (req, res) => {
     const user = req.user;
     const { bookingStatus } = req.query;
 
-    const allowedStatuses = ['pending', 'upcoming', 'in-progress', 'completed', 'cancelled'];
+    const allowedStatuses = ['upcoming', 'in-progress', 'completed', 'cancelled'];
 
     if (bookingStatus && !allowedStatuses.includes(bookingStatus)) {
         console.log(`Invalid bookingStatus. Allowed values are: ${allowedStatuses.join(', ')}.`.red);
@@ -99,41 +99,53 @@ const getAllSUBookings = asyncHandler(async (req, res) => {
         });
     }
 
-    let filter = { user };
+    // Set initial filter for user and successful payment status
+    let filter = { user, paymentStatus: 'completed' };
 
+    // Add bookingStatus to the filter if it's provided in the query
     if (bookingStatus) {
         filter.bookingStatus = bookingStatus;
     }
 
+    const currentDate = new Date().toISOString().split('T')[0];
+
+    // Fetch bookings with the filter applied
     let bookings = await Booking.find(filter)
         .populate({
             path: 'listing',
             select: 'propertyId propertyName propertyLocation livingRoomPictures chargePerNight bedroomTotal totalGuestsAllowed bedTotal bathroomTotal description arrivalDepartureDetails',
-        });
+        })
+        .sort({ createdAt: -1 });
 
     if (bookings.length < 1) {
         console.log("Total of 0 bookings found".red);
         return res.status(200).json({
             success: true,
             message: "You currently have no bookings at the moment, checkout some nice apartments nearby, make payment for the one of your choice, and enjoy a seamless stay",
-            data: []
+            data: []    
         });
     }
 
-    // Get current date in 'yyyy-mm-dd' format
-    const currentDate = new Date().toISOString().split('T')[0];
-
     // Iterate over bookings and update status
     for (let booking of bookings) {
-        const allDaysPassed = booking.bookedDays.every(date => date < currentDate);
+        const firstBookedDay = booking.bookedDays[0];
+        const lastBookedDay = booking.bookedDays[booking.bookedDays.length - 1];
 
-        if (allDaysPassed && booking.bookingStatus !== 'completed') {
+        if (currentDate < firstBookedDay) {
+            // Booking is in the future
+            booking.bookingStatus = 'upcoming';
+        } else if (currentDate >= firstBookedDay && currentDate <= lastBookedDay) {
+            // Booking is currently in-progress
+            booking.bookingStatus = 'in-progress';
+        } else if (currentDate > lastBookedDay) {
+            // Booking is completed
             booking.bookingStatus = 'completed';
-            await booking.save(); 
-            console.log(`Booking with ID ${booking._id} marked as completed`.cyan);
         }
+
+        await booking.save(); // Save the updated status
     }
 
+    // Format bookings data for response
     const formattedBookings = bookings.map(booking => {
         const formattedBookedDays = formatBookedDays(booking.bookedDays);
         
@@ -141,6 +153,7 @@ const getAllSUBookings = asyncHandler(async (req, res) => {
             id: booking.listing._id, 
             email: req.user.email,
             propertyId: booking.listing.propertyId,
+            paymentStatus: booking.paymentStatus,
             propertyName: booking.listing.propertyName,
             bookedDays: formattedBookedDays,
             totalNights: booking.bookedDays.length,
@@ -167,7 +180,6 @@ const getAllSUBookings = asyncHandler(async (req, res) => {
         data: formattedBookings,
     });
 });
-
 
 const getSUBookingHistory = asyncHandler(async (req, res) => {
     console.log("Getting all space user booking history".yellow);

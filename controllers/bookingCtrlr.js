@@ -154,10 +154,8 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
     const listingCharge = listing.chargePerNight
     const totalNights = uniqueBookedDays.length
     const amountIncurred = listingCharge * totalNights
-    const totalAmountIncured = amountIncurred + 2000 
+    const totalAmountIncured = amountIncurred
     const listingDiscount = listing.discount
-
-    console.log("Booked dates: ", uniqueBookedDays)
 
     const amountInKobo = totalAmountIncured * 100;
 
@@ -201,6 +199,7 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
             spaceOwnerId: listing.user._id,
             paymentType: "paystack",
             paymentStatus: "payment-pending",
+            bookingStatus: 'payment-pending',
             paystackRef: reference,
             paystackAccessCode: access_code,
             paystackReference: reference,
@@ -221,10 +220,10 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
         await newBooking.save()
         
 
-        console.log(`charge per night: ${listingCharge}\nTotal nights booked: ${totalNights}\nTotal incured charge: ${totalAmountIncured}\n`.cyan)
+        console.log("New booking successfully initiated".cyan)
         res.status(200).json({
             success: true,
-            message: `Transaction initialized. Total amount incured for ${totalNights} night(s) at ${listingCharge} per night is: ${totalAmountIncured}`,
+            message: `New booking successfully initiated`,
             data: {
                 authorization_url,
                 access_code,
@@ -303,7 +302,7 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
             `https://api.paystack.co/transaction/verify/${reference}`,
             {
                 headers: {
-                    Authorization: `Bearer ${process.env.PAYSTACK_LIVE_SECRET_KEY}`,
+                    Authorization: `Bearer ${paystackKey}`,
                 },
             }
         );
@@ -328,17 +327,15 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
             });
         }
 
-        // if (booking.paystackPaymentStatus === 'success') {
-        //     console.log("booking has already been verified as successful".bgRed);
-        //     return res.status(400).json({
-        //         success: false,
-        //         message: 'Transaction has already been verified as successful.',
-        //     });
-        // }
+        if (booking.paystackPaymentStatus === 'success') {
+            console.log("booking has already been verified as successful".bgRed);
+            return res.status(400).json({
+                success: false,
+                message: 'This booking transaction has already been verified as successful.',
+            });
+        }
 
         const amountPaidToPaystack = paystackKoboAmount / 100;
-
-        console.log(`Total incured charge: ${booking.totalIncuredCharge}\nAmount paid by user: ${amountPaidToPaystack}`.yellow)
 
         if (booking.totalIncuredCharge !== amountPaidToPaystack) {
             console.log("Paid amount does not match expected amount.".red)
@@ -353,7 +350,7 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
 
         // Step 5: Update the booking's status and generate invoiceId
         booking.paystackPaymentStatus = 'success';
-        booking.paymentStatus = 'success';
+        booking.paymentStatus = 'completed';
         booking.bookingStatus = 'upcoming';
         booking.invoiceId = generateInvoiceId();
         await booking.save();
@@ -368,7 +365,7 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
 
         if(listing) {
             const newBookedDays = booking.bookedDays;
-            console.log("Booked days: ",newBookedDays)
+            // console.log("Booked days: ",newBookedDays)
             listing.calendar.bookedDays = [...listing.calendar.bookedDays, ...newBookedDays];
             // Check if the user is already in propertyUsers
             if (!listing.propertyUsers.includes(userId)) {
@@ -453,7 +450,7 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
                 formattedBookingTotalCharge
             )
 
-            console.log("Wallet: ", wallet)
+            // console.log("Wallet: ", wallet)
 
             res.status(200).json({
                 success: true,
@@ -584,7 +581,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
         const listingChargePerNightWith10Percent = listing.chargePerNight
         const totalNights = uniqueBookedDays.length
         const amountIncurred = listingChargePerNightWith10Percent * totalNights
-        const totalAmountIncuredWithTotalNightsAnd2000Charges = amountIncurred + 2000
+        const totalAmountIncuredWithTotalNightsAnd2000Charges = amountIncurred
 
         // Check for conflicting dates
         const conflictingDates = listing.calendar.unavailableDays.filter(date => newBookedDays.includes(date));
@@ -630,7 +627,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             totalIncuredCharge: totalAmountIncuredWithTotalNightsAnd2000Charges,
             totalIncuredChargeAfterDiscount: totalAmountIncuredWithTotalNightsAnd2000Charges - (discount || 0),
             discount: discount || 0,
-            bookingStatus: "pending"
+            bookingStatus: "upcoming"
         });
 
         // Update listing with booked days
@@ -741,25 +738,31 @@ export const spaceOwnerFetchBookingHistoryForALisitng = asyncHandler(async (req,
         console.log(`Fetching booking history for specific listing`.yellow);
 
         // Fetch bookings based on filter
-        const bookings = await Booking.find(filter)
+        let bookings = await Booking.find(filter)
             .populate('user')
             .populate('listing')
             .sort({ date: -1 });
 
-        const currentDate = new Date();
+        const currentDate = new Date().toISOString().split('T')[0];
 
         // Update booking status to "completed" if all dates in `bookedDays` have passed
-        await Promise.all(
-            bookings.map(async (booking) => {
-                const allDatesPassed = booking.bookedDays.every(bookedDate => new Date(bookedDate) < currentDate);
-
-                if (allDatesPassed && booking.bookingStatus !== "completed") {
-                    console.log("Changing booking status to completed".blue)
-                    booking.bookingStatus = "completed";
-                    await booking.save(); // Save the status update
-                }
-            })
-        );
+        for (let booking of bookings) {
+            const firstBookedDay = booking.bookedDays[0];
+            const lastBookedDay = booking.bookedDays[booking.bookedDays.length - 1];
+    
+            if (currentDate < firstBookedDay) {
+                // Booking is in the future
+                booking.bookingStatus = 'upcoming';
+            } else if (currentDate >= firstBookedDay && currentDate <= lastBookedDay) {
+                // Booking is currently in-progress
+                booking.bookingStatus = 'in-progress';
+            } else if (currentDate > lastBookedDay) {
+                // Booking is completed
+                booking.bookingStatus = 'completed';
+            }
+    
+            await booking.save(); // Save the updated status
+        }
 
         // Format bookings for response
         const formattedBookings = bookings.map(booking => ({

@@ -62,9 +62,8 @@ export const spaceOwnerGetWallet = asyncHandler(async (req, res) => {
             message: "User dashboard successfully retrieved",
             data: {
                 wallet: {
-                    currentBalance: walletMetrics.currentBalance,
-                    witdrawn: walletMetrics.totalWithdrawn,
-                    allTimeEarned: walletMetrics.totalEarned
+                    availableBalance: walletMetrics.currentBalance,
+                    totalEarnings: walletMetrics.totalEarned
                 },
                 withdrawals: formattedWithdrawals,
                 bookings: formattedBookings
