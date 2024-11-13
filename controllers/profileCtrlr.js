@@ -22,6 +22,14 @@ const getSpaceUserDashboard = asyncHandler(async (req, res) => {
             });
         }
 
+        if(user.userType !== "space-user") {
+            console.log("Only space users are allowed".red)
+            res.status(403).json({
+                success: false,
+                message: "Only space users are allowed"
+            })
+        }
+
         // Fetch notifications and exclude unwanted fields from listing
         const notifications = await Notification.find({ user: userId })
             .populate({
@@ -43,6 +51,7 @@ const getSpaceUserDashboard = asyncHandler(async (req, res) => {
         const upcomingBookings = await Booking.find({
             user: userId,
             bookingStatus: 'upcoming',
+            paymentStatus: "completed"
         })
         .populate({
             path: 'listing',
@@ -54,7 +63,7 @@ const getSpaceUserDashboard = asyncHandler(async (req, res) => {
             return {
                 propertyName: upcoming.listing.propertyName,
                 bookingStatus: upcoming.bookingStatus,
-                status: upcoming.paystackPaymentStatus,
+                status: upcoming.paymentStatus,
                 apartmentNumber: upcoming.listing.propertyLocation.apartmentNumber,
                 propertyImage: livingRoomPictures?.length > 0 
                     ? livingRoomPictures[0].secure_url 
