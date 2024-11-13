@@ -55,7 +55,7 @@ const getSpaceUserDashboard = asyncHandler(async (req, res) => {
         .populate({
             path: 'listing',
             select: 'propertyId propertyName propertyLocation livingRoomPictures',
-        }).sort({createdAt: -1 });
+        }).sort({updatedAt: -1});
 
         const formattedUpcomings = upcomingBookings.map(upcoming => {
             const livingRoomPictures = upcoming.listing.livingRoomPictures;
@@ -130,7 +130,8 @@ const getAllSUBookings = asyncHandler(async (req, res) => {
         .populate({
             path: 'listing',
             select: 'propertyId propertyName propertyLocation livingRoomPictures chargePerNight bedroomTotal totalGuestsAllowed bedTotal bathroomTotal description arrivalDepartureDetails',
-        });
+        })
+        .sort({ updatedAt: -1 });
 
     if (bookings.length < 1) {
         console.log("Total of 0 bookings found".red);
