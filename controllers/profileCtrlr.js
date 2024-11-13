@@ -50,7 +50,6 @@ const getSpaceUserDashboard = asyncHandler(async (req, res) => {
         // Fetch upcoming bookings as before
         const upcomingBookings = await Booking.find({
             user: userId,
-            bookingStatus: 'upcoming',
             paymentStatus: "completed"
         })
         .populate({
