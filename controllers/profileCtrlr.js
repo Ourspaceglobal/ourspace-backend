@@ -63,7 +63,7 @@ const getSpaceUserDashboard = asyncHandler(async (req, res) => {
             return {
                 propertyName: upcoming.listing.propertyName,
                 bookingStatus: upcoming.bookingStatus,
-                status: "payment verified successfully",
+                status: "Booking successful",
                 apartmentNumber: upcoming.listing.propertyLocation.apartmentNumber,
                 propertyImage: livingRoomPictures?.length > 0 
                     ? livingRoomPictures[0].secure_url 
