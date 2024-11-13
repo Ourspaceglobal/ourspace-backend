@@ -55,7 +55,7 @@ const getSpaceUserDashboard = asyncHandler(async (req, res) => {
         .populate({
             path: 'listing',
             select: 'propertyId propertyName propertyLocation livingRoomPictures',
-        });
+        }).sort({createdAt: -1 });
 
         const formattedUpcomings = upcomingBookings.map(upcoming => {
             const livingRoomPictures = upcoming.listing.livingRoomPictures;
