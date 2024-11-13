@@ -1,5 +1,5 @@
 import express from "express";
-import { getAllNotifications, getAllSUBookings, getSpaceOwnerDashboard, getSpaceUserDashboard, getSUBookingHistory } from "../controllers/profileCtrlr.js";
+import { getAllNotifications, getAllSUBookings, getSpaceOwnerDashboard, getSpaceUserDashboard, getSUBookingHistory, helperLogic } from "../controllers/profileCtrlr.js";
 import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -11,6 +11,8 @@ router.route("/su-get-all-booking-history").get(protect, getSUBookingHistory)
 
                         /// SPACE OWNERS
 router.route("/so-get-dashboard").get(protect, getSpaceOwnerDashboard)
+
+router.route("/helper").put(helperLogic)
 
 export default router;
 

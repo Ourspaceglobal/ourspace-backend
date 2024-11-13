@@ -89,7 +89,15 @@ const getAllSUBookings = asyncHandler(async (req, res) => {
     const user = req.user;
     const { bookingStatus } = req.query;
 
-    const allowedStatuses = ['upcoming', 'in-progress', 'completed', 'cancelled'];
+    if(user.userType !== "space-user"){
+        console.log("Only space users are allowed".red)
+        res.status(401).json({
+            success: false,
+            message: "Only space users are allowed"
+        })
+    }
+
+    const allowedStatuses = ["awaiting-payment", 'upcoming', 'in-progress', 'completed', 'cancelled'];
 
     if (bookingStatus && !allowedStatuses.includes(bookingStatus)) {
         console.log(`Invalid bookingStatus. Allowed values are: ${allowedStatuses.join(', ')}.`.red);
@@ -100,7 +108,7 @@ const getAllSUBookings = asyncHandler(async (req, res) => {
     }
 
     // Set initial filter for user and successful payment status
-    let filter = { user, paymentStatus: 'completed' };
+    let filter = { user };
 
     // Add bookingStatus to the filter if it's provided in the query
     if (bookingStatus) {
@@ -176,6 +184,7 @@ const getAllSUBookings = asyncHandler(async (req, res) => {
     console.log(`Total of ${bookings.length} bookings found`.magenta);
     return res.status(200).json({
         success: true,
+        total: bookings.length,
         message: `Total of ${bookings.length} bookings found`,
         data: formattedBookings,
     });
@@ -352,6 +361,53 @@ const format = asyncHandler(async(req, res)=> {
     console.log("getting all space user bookings".yellow)
 })
 
+const helperLogic = asyncHandler(async (req, res) => {
+    console.log("Making use of helper functions".yellow);
+
+    // Retrieve all bookings
+    const bookings = await Booking.find();
+
+    if (!bookings || bookings.length === 0) {
+        console.log("No booking found".red);
+        return res.status(200).json({
+            success: true,
+            message: "No booking available at the moment",
+        });
+    }
+
+    try {
+        // Update `paymentStatus` to "awaiting-payment" where it's not already set
+        for (const booking of bookings) {
+            if (booking.paymentStatus !== "awaiting-payment") {
+                booking.paymentStatus = "awaiting-payment";
+                await booking.save();
+            }
+        }
+
+        // Update `bookingStatus` to "awaiting-payment" where it's not already set
+        for (const booking of bookings) {
+            if (booking.bookingStatus !== "awaiting-payment") {
+                booking.bookingStatus = "awaiting-payment";
+                await booking.save();
+            }
+        }
+
+        console.log("Helper function executed successfully".green);
+        return res.status(200).json({
+            success: true,
+            message: "Bookings updated to awaiting-payment where applicable",
+        });
+    } catch (error) {
+        console.error("Error updating bookings:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred while updating bookings",
+            error: error.message,
+        });
+    }
+});
+
+
 
 
 export {
@@ -361,4 +417,7 @@ export {
     getSUBookingHistory,
     // space owner
     getSpaceOwnerDashboard,
+
+
+    helperLogic
 }
