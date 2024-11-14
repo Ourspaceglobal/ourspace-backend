@@ -527,23 +527,97 @@ const chatWithSpaceOwner = asyncHandler(async (req, res) => {
           sender: user._id,
           receiver: listing.user._id,
           listing: listing._id
-      });
+      }).sort({ createdAt: -1 }); // Sort to get the latest message
 
+      // If there’s an existing chat, check the content of the last message
       if (existingChat) {
-          console.log("Chat already exists between the space user and owner for this listing.".blue);
-          return res.status(200).json({
-              success: true,
-              message: "Chat already exists",
-              chat: existingChat // Return existing chat if it exists
-          });
+          const lastMessage = await Message.findOne({
+              sender: user._id,
+              receiver: listing.user._id,
+              listing: listing._id
+          }).sort({ createdAt: -1 });
+
+          // Check if the last message content starts with "New discussion on"
+          if (lastMessage && lastMessage.content.startsWith("New discussion on")) {
+              // Delete the last message if it starts with "New discussion on"
+              await Message.findByIdAndDelete(lastMessage._id);
+              console.log(`Deleted previous "New discussion on" message with ID: ${lastMessage._id}`.yellow);
+          }
       }
 
-      // If no existing chat, create a new chat message
+      // Create a new message to start or continue the conversation
       const newChat = await Message.create({
           sender: user._id,
           receiver: listing.user._id,
           listing: listing._id,
-          content: `New discussion on ${listing.propertyName} at ${listing.propertyLocation.city}`
+          content: `New discussion on being good for ${listing.propertyName} at ${listing.propertyLocation.city}`
+      });
+
+      console.log("New chat created between space user and owner.".green);
+      return res.status(201).json({
+          success: true,
+          message: "New chat created",
+          chat: newChat // Return newly created chat
+      });
+
+  } catch (error) {
+      console.error("Error initiating chat:", error);
+      return res.status(500).json({
+          success: false,
+          message: "An error occurred while trying to initiate chat",
+          error: error.message
+      });
+  }
+});
+
+const chatWithSpaceUser= asyncHandler(async (req, res) => {
+  console.log("Chat with space owner before booking".yellow);
+
+  const user = req.user;
+  const { bookingId } = req.body;
+
+  try {
+      // Check if the listing exists and populate the owner
+      const booking = await Booking.findById(bookingId).populate("user").populate("listing");
+      if (!booking) {
+          console.log("This booking is currently not available for messaging".red);
+          return res.status(404).json({
+              success: false,
+              message: "This booking is currently not available for messaging"
+          });
+      }
+
+      console.log(`bookingId: ${booking._id}, \nSenderId: ${user._id} \nReceiverId: ${booking.user._id}`.cyan);
+
+      // Check if an existing chat between the user and the listing owner already exists for this listing
+      const existingChat = await Message.findOne({
+          sender: user._id,
+          receiver: booking.user._id,
+          listing: booking.listing._id
+      }).sort({ createdAt: -1 }); // Sort to get the latest message
+
+      // If there’s an existing chat, check the content of the last message
+      if (existingChat) {
+          const lastMessage = await Message.findOne({
+              sender: user._id,
+              receiver: booking.user._id,
+              listing: booking.listing._id
+          }).sort({ createdAt: -1 });
+
+          // Check if the last message content starts with "New discussion on"
+          if (lastMessage && lastMessage.content.startsWith("New discussion on")) {
+              // Delete the last message if it starts with "New discussion on"
+              await Message.findByIdAndDelete(lastMessage._id);
+              console.log(`Deleted previous "New discussion on" message with ID: ${lastMessage._id}`.yellow);
+          }
+      }
+
+      // Create a new message to start or continue the conversation
+      const newChat = await Message.create({
+          sender: user._id,
+          receiver: booking.user._id,
+          listing: booking.listing._id,
+          content: `New discussion on being good for ${booking.listing.propertyName} at ${booking.listing.propertyLocation.city}`
       });
 
       console.log("New chat created between space user and owner.".green);
@@ -564,13 +638,13 @@ const chatWithSpaceOwner = asyncHandler(async (req, res) => {
 });
 
 
-
 export { 
   sendMessage, 
   spaceOwnerGetAllChats,
   spaceUserGetAllChats,
   getMessagesForAListing,
   postmanSendMessage,
-  chatWithSpaceOwner
+  chatWithSpaceOwner,
+  chatWithSpaceUser
 };
 
