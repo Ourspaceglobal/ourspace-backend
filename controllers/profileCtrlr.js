@@ -254,6 +254,127 @@ const getSUBookingHistory = asyncHandler(async (req, res) => {
     });
 });
 
+const getAllSpaceOwnerBookingHistory = asyncHandler(async (req, res) => {
+    console.log("Getting all space owner bookings".yellow);
+
+    let user = req.user;
+    const { bookingStatus } = req.query;
+
+    if(user.userType !== "space-owner"){
+        console.log("Only space users are allowed".red)
+        res.status(401).json({
+            success: false,
+            message: "Only space users are allowed"
+        })
+    }
+
+    const allowedStatuses = ["awaiting-payment", 'upcoming', 'in-progress', 'completed', 'cancelled'];
+
+    if (bookingStatus && !allowedStatuses.includes(bookingStatus)) {
+        console.log(`Invalid bookingStatus. Allowed values are: ${allowedStatuses.join(', ')}.`.red);
+        return res.status(400).json({
+            success: false,
+            message: `Invalid bookingStatus. Allowed values are: ${allowedStatuses.join(', ')}.`,
+        });
+    }
+
+    // Set initial filter for user and successful payment status
+    const spaceOwnerId = user._id
+    let filter = { spaceOwnerId };
+
+    // Add bookingStatus to the filter if it's provided in the query
+    if (bookingStatus) {
+        filter.bookingStatus = bookingStatus;
+    }
+
+    const currentDate = new Date().toISOString().split('T')[0];
+
+    // Fetch bookings with the filter applied
+    let bookings = await Booking.find(filter)
+        .populate({
+            path: 'listing',
+            select: 'propertyId propertyName propertyLocation livingRoomPictures chargePerNight bedroomTotal totalGuestsAllowed bedTotal bathroomTotal description arrivalDepartureDetails',
+        })
+        .populate("user")
+        .sort({ updatedAt: -1 });
+
+    if (bookings.length < 1) {
+        console.log("Total of 0 bookings found".red);
+        return res.status(200).json({
+            success: true,
+            message: "You currently have no bookings at the moment, checkout some nice apartments nearby, make payment for the one of your choice, and enjoy a seamless stay",
+            data: []    
+        });
+    }
+
+    for (let booking of bookings) {
+        if(!booking.listing) {
+            console.log("Deleting booking".green)
+            await Booking.findByIdAndDelete(booking._id)
+            console.log("Booking successfully deleted".red)
+        }
+    }
+
+    // Iterate over bookings and update status
+    for (let booking of bookings) {
+        const firstBookedDay = booking.bookedDays[0];
+        const lastBookedDay = booking.bookedDays[booking.bookedDays.length - 1];
+
+        if(booking.paymentStatus === "completed") {
+            if (currentDate < firstBookedDay) {
+                // Booking is in the future
+                booking.bookingStatus = 'upcoming';
+            } else if (currentDate >= firstBookedDay && currentDate <= lastBookedDay) {
+                // Booking is currently in-progress
+                booking.bookingStatus = 'in-progress';
+            } else if (currentDate > lastBookedDay) {
+                // Booking is completed
+                booking.bookingStatus = 'completed';
+            }
+        }
+
+        await booking.save(); // Save the updated status
+    }
+
+    // Format bookings data for response
+    const formattedBookings = bookings.map(booking => {
+        const formattedBookedDays = formatBookedDays(booking.bookedDays);
+        
+        return {
+            id: booking._id, 
+            email: req.user.email,
+            propertyId: booking.listing?.propertyId || "null",
+            paymentStatus: booking.paymentStatus,
+            propertyName: booking.listing?.propertyName || "null",
+            geustName: booking.user.firstName + " " + booking.user.lastName,
+            bookedDays: formattedBookedDays,
+            totalNights: booking.bookedDays.length,
+            totalGuests: booking.totalGuest,
+            checkIn: `${booking.listing?.arrivalDepartureDetails.checkIn.from || "null"} - ${booking.listing?.arrivalDepartureDetails.checkIn.to || "null"}`,
+            checkOut: `${booking.listing?.arrivalDepartureDetails.checkOut.from|| "null"} - ${booking.listing?.arrivalDepartureDetails.checkOut.to || "null"}`,
+            propertyLocation: booking.listing?.propertyLocation,
+            bookingStatus: booking.bookingStatus,
+            chargePerNight: booking.listing.chargePerNightWithout10Percent,
+            totalCharge: booking.listing.chargePerNightWithout10Percent * booking.bookedDays.length,
+            bedroomTotal: booking.listing.bedroomTotal,
+            totalBeds: booking.listing.bedTotal,
+            totalBathroom: booking.listing.bathroomTotal,
+            description: booking.listing.description,
+            propertyImage: booking.listing.livingRoomPictures[0],
+            timestamp: booking.createdAt,
+        };
+    });
+    
+
+    console.log(`Total of ${bookings.length} bookings found`.magenta);
+    return res.status(200).json({
+        success: true,
+        total: bookings.length,
+        message: `Total of ${bookings.length} bookings found`,
+        data: formattedBookings,
+    });
+});
+
 const getAllNotifications = asyncHandler(async(req, res)=> {
     console.log("getting all notifications for user ".yellow)
 
@@ -490,6 +611,7 @@ export {
     cancelBooking,
     // space owner
     getSpaceOwnerDashboard,
+    getAllSpaceOwnerBookingHistory,
 
 
     helperLogic
