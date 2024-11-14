@@ -740,8 +740,9 @@ const getAllListingForHomepage = asyncHandler(async (req, res) => {
   console.log("Fetching all listings for homepage".yellow);
 
   try {
-    // Fetch listings with status 'listed', sorted by creation date in descending order
-    const availableListings = await Listing.find({ status: "listed" }).sort({ createdAt: -1 });
+    // Fetch listings with status 'listed', sorted by price (ascending) and then by updatedAt (descending)
+    const availableListings = await Listing.find({ status: "listed" })
+      .sort({ chargePerNight: 1, updatedAt: -1 }); // 1 for ascending, -1 for descending
 
     if (!availableListings || availableListings.length < 1) {
       console.log("No listings found".red);
@@ -768,6 +769,7 @@ const getAllListingForHomepage = asyncHandler(async (req, res) => {
     });
   }
 });
+
 
 const getListingByCategory = asyncHandler(async (req, res) => {
   console.log("Fetching listings by category".yellow);
