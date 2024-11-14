@@ -1,6 +1,7 @@
 import express from "express";
 import { bookWithWallet, checkAvailability, spaceOwnerFetchBookingHistoryForALisitng, initializeTransaction, verifyTransaction } from "../controllers/bookingCtrlr.js";
 import { protect } from "../middleware/authMiddleware.js";
+import { cancelBooking } from "../controllers/profileCtrlr.js";
 
 const router  = express.Router()
 
@@ -13,7 +14,6 @@ router.route("/paystack/verify").post(protect, verifyTransaction)
 router
 .route("/book-with-wallet")
 .post(protect, bookWithWallet)
-
 
 router
 .route("/specific-listing-bookings/:listingId")

@@ -147,15 +147,17 @@ const getAllSUBookings = asyncHandler(async (req, res) => {
         const firstBookedDay = booking.bookedDays[0];
         const lastBookedDay = booking.bookedDays[booking.bookedDays.length - 1];
 
-        if (currentDate < firstBookedDay) {
-            // Booking is in the future
-            booking.bookingStatus = 'upcoming';
-        } else if (currentDate >= firstBookedDay && currentDate <= lastBookedDay) {
-            // Booking is currently in-progress
-            booking.bookingStatus = 'in-progress';
-        } else if (currentDate > lastBookedDay) {
-            // Booking is completed
-            booking.bookingStatus = 'completed';
+        if(booking.paymentStatus === "completed") {
+            if (currentDate < firstBookedDay) {
+                // Booking is in the future
+                booking.bookingStatus = 'upcoming';
+            } else if (currentDate >= firstBookedDay && currentDate <= lastBookedDay) {
+                // Booking is currently in-progress
+                booking.bookingStatus = 'in-progress';
+            } else if (currentDate > lastBookedDay) {
+                // Booking is completed
+                booking.bookingStatus = 'completed';
+            }
         }
 
         await booking.save(); // Save the updated status
@@ -166,7 +168,7 @@ const getAllSUBookings = asyncHandler(async (req, res) => {
         const formattedBookedDays = formatBookedDays(booking.bookedDays);
         
         return {
-            id: booking.listing._id, 
+            id: booking._id, 
             email: req.user.email,
             propertyId: booking.listing.propertyId,
             paymentStatus: booking.paymentStatus,
@@ -363,8 +365,6 @@ const getSpaceOwnerDashboard = asyncHandler(async (req, res) => {
     }
 });
 
-
-
 const format = asyncHandler(async(req, res)=> {
     console.log("getting all space user bookings".yellow)
 })
@@ -415,6 +415,70 @@ const helperLogic = asyncHandler(async (req, res) => {
     }
 });
 
+const cancelBooking = asyncHandler(async (req, res) => {
+    console.log("Canceling an unpaid booking".red);
+
+    const user = req.user;
+    const { bookingId } = req.body;
+
+    console.log("Booking id: ",bookingId)
+
+    if (!bookingId) {
+        console.log("Booking id is required".red);
+        return res.status(400).json({
+            success: false,
+            message: "BookingId is required",
+        });
+    }
+
+    try {
+        const existingBooking = await Booking.findById(bookingId);
+
+        // Check if booking exists
+        if (!existingBooking) {
+            console.log("Booking does not exist".red);
+            return res.status(404).json({
+                success: false,
+                message: "Booking does not exist",
+            });
+        }
+
+        // Ensure the booking belongs to the user
+        if (existingBooking.user.toString() !== user._id.toString()) {
+            console.log("Only owners of bookings can cancel a booking".red);
+            return res.status(403).json({
+                success: false,
+                message: "Only owners of bookings can cancel a booking",
+            });
+        }
+
+        // Update booking status if not already canceled
+        if (existingBooking.bookingStatus !== "cancelled" && existingBooking.paymentStatus !== "completed") {
+            existingBooking.bookingStatus = "cancelled";
+            existingBooking.paymentStatus = "cancelled";
+            await existingBooking.save();
+            console.log("Booking status updated to cancelled".green);
+        } else {
+            console.log("Booking is already cancelled".yellow);
+        }
+
+        // Respond with success
+        return res.status(200).json({
+            success: true,
+            message: "Booking successfully cancelled",
+        });
+    } catch (error) {
+        console.error("Error cancelling booking", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred while canceling the booking",
+            error: error.message,
+        });
+    }
+});
+
+
+
 
 
 
@@ -423,6 +487,7 @@ export {
     getAllSUBookings,
     getAllNotifications,
     getSUBookingHistory,
+    cancelBooking,
     // space owner
     getSpaceOwnerDashboard,
 
