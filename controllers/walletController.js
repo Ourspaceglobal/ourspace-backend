@@ -133,11 +133,12 @@ export const soGetSingleBookingFromWalletDashboard = asyncHandler(async (req, re
                 invoiceId: bookingPayment.invoiceId,  
                 date: formatDate(bookingPayment.createdAt),
                 propertyName: bookingPayment.listing.propertyName,
-                user: bookingPayment.user.firstName + " " + bookingPayment.user.lastName,
+                paymentMethod: bookingPayment.paymentType,
+                // user: bookingPayment.user.firstName + " " + bookingPayment.user.lastName,
                 description: `${bookingPayment.listing.propertyId} - ${bookingPayment.listing.propertyName} (Room ${bookingPayment.listing.propertyLocation.apartmentNumber})`,
                 totalNights: bookingPayment.bookedDays.length,
-                chargePerNight: bookingPayment.chargePerNight,
-                totalIncuredCharge: `${formatAmount(bookingPayment.totalIncuredChargeAfterDiscount)}`
+                chargePerNight: bookingPayment.listing.chargePerNightWithout10Percent,
+                totalIncuredCharge: `${formatAmount(bookingPayment.listing.chargePerNightWithout10Percent * bookingPayment.bookedDays.length)}`
             };
     
             console.log("Booking payment history found".green);
@@ -172,9 +173,8 @@ export const soGetSingleBookingFromWalletDashboard = asyncHandler(async (req, re
                 id: withdrawal._id,
                 invoiceId: withdrawal.paystack_id,
                 date: formatDate(withdrawal.createdAt),
-                description: `${withdrawal.reason}`,
                 amount: `#${formatAmount(withdrawal.amount)}`,
-                accountName: withdrawal.user.firstName + " " + withdrawal.user.lastName,
+                accountNumber: "incoming",
                 status: withdrawal.status
             };
     
