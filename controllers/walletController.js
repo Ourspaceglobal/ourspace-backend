@@ -647,48 +647,84 @@ export const getTransactionsForSpaceUsersWallet = asyncHandler(async (req, res) 
     console.log("Getting transaction history for space users".blue);
     const user_id = req.user._id; 
 
+    const { filter } = req.query
+    console.log("Filter: ", filter)
+
     try {
-        const bookings = await Booking.find({ user: user_id }).sort({ updatedAt: -1 });
+        let bookings;
+        let refunds;
+        let topUps;
 
-        // Format booking data
-        const formattedBookings = bookings.map((booking) => ({
-            id: booking._id,
-            invoiceId: booking.invoiceId,
-            date: formatDateForSUTransactionHistory(booking.updatedAt),  
-            description: "Booking",
-            amount: booking.chargePerNight + 2000,
-            paymentMethod: booking.paymentType,
-            paymentStatus: booking.paystackPaymentStatus
-        }));
+        if(filter === "bookings") {
+            bookings = await Booking.find({ user: user_id }).populate("listing").sort({ updatedAt: -1 });
 
-        const fundinghistory = await FundingHistory.find({ user: req.user._id }).sort({ updatedAt: -1 });
+            if(!bookings || bookings.lenght < 1 ) {
+                console.log("No booking history available at the moment".red)
+                return res.status(200).json({
+                    success: true,
+                    message: "No booking history available at the moment"
+                })
+            }
 
-        const formattedFundingHistory = fundinghistory.map((funding) => ({
-            id: funding._id,
-            invoiceId: funding.invoiceId,
-            date: formatDateForSUTransactionHistory(funding.updatedAt),
-            description: "Wallet funding",
-            amount: funding.amount_to_fund,
-            paymentMethod: funding.mode_of_funding,
-            paymentStatus: funding.payment_status
-        }));
+            const formattedBookings = bookings.map((booking) => ({
+                id: booking._id,
+                invoiceId: booking.invoiceId,
+                bookingId: booking.invoiceId,
+                date: formatDateForSUTransactionHistory(booking.updatedAt),  
+                spaceName: booking.listing.propertyName,
+                totalNights: booking.bookedDays.length,
+                chargePerNight: booking.listing.chargePerNight,
+                amount: booking.chargePerNight * booking.bookedDays.length,
+                paymentMethod: booking.paymentType,
+                paymentStatus: booking.paymentStatus
+            }));
 
-        // Combine and sort by `updatedAt` field using the raw data
-        const formattedResponse = formattedBookings.concat(formattedFundingHistory)
-            .sort((a, b) => new Date(b.date) - new Date(a.date));
+            console.log("All bookings returned".cyan)
+            return res.status(200).json({
+                success: true,
+                message: "Bookings wallet transactions successfully retrieved",
+                totalBookings: bookings.length,
+                data: formattedBookings
+            });
+        }
 
-        console.log(`Bookings total: ${bookings.length}`);
-        console.log(`Fundings total: ${fundinghistory.length}`);
-        console.log(`Transactions retrieved successfully`.green);
+        if(filter === "topUps") {
+            topUps = await FundingHistory.find({ user: req.user._id }).sort({ createdAt: -1 });
 
-        return res.status(200).json({
-            success: true,
-            message: "Wallet transactions successfully retrieved",
-            totalBookings: formattedBookings.length,
-            data: formattedResponse
-        });
+            if(!topUps || topUps.lenght < 1 ) {
+                console.log("No top up history available at the moment".red)
+                return res.status(200).json({
+                    success: true,
+                    message: "No top up history available at the moment"
+                })
+            }
 
-    } catch (error) {
+            const formattedFundingHistory = topUps.map((topUp) => ({
+                id: topUp._id,
+                invoiceId: topUp.invoiceId,
+                date: formatDateForSUTransactionHistory(topUp.updatedAt),
+                description: "Wallet topUp",
+                amount: topUp.amount_to_fund,
+                paymentMethod: topUp.mode_of_funding,
+                paymentStatus: topUp.payment_status
+            }));
+
+            console.log("All wallet fundings returned".cyan)
+            return res.status(200).json({
+                success: true,
+                message: "All wallet fundings successfully retrieved",
+                totalBookings: topUps.length,
+                data: formattedFundingHistory
+            });
+        } else {
+            console.log("Invalid filter provided")
+            return res.status(500).json({
+                success: false,
+                message: "Invalid filter provided"
+            })
+        }
+
+    } catch (error) {   
         console.error("Error retrieving transactions: ", error);
         return res.status(500).json({
             success: false,
