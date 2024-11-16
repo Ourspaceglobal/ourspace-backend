@@ -21,7 +21,7 @@ const walletFundingSchema = new mongoose.Schema({
      access_code: { type: String, required: true },
      paystack_ref: { type: String, required: true},
      display_image: { type: String, required: true},
-     mode_of_funding: {type: String, default: "web-payment", required: true}
+     mode_of_funding: {type: String, default: "Bank payment", required: true}
 }, {timestamps: true})
 
 // Pre-save hook to generate and assign a unique invoiceId

@@ -31,16 +31,48 @@ export const spaceOwnerGetWallet = asyncHandler(async (req, res) => {
             .populate('listing')
             .populate('user').sort({updatedAt: -1});
 
-        console.log(`Total of ${bookings.length} bookings found`.green);
+            if(bookings.length < 1) {
+                console.log("No bookings found at the moment".red)
+                    return res.status(200).json({
+                        success: true,
+                        message: "No bookings found at the moment"
+                    })
+            }
+
+            const currentDate = new Date();
+
+            for(let booking in bookings) {
+                if (!Array.isArray(booking.bookedDays) || booking.bookedDays.length === 0) {
+                    console.log(`Booking ${booking._id} has no bookedDays or it's invalid`.yellow);
+                    continue; // Skip this booking
+                }
+                const firstBookedDay = booking.bookedDays[0];
+                const lastBookedDay = booking.bookedDays[booking.bookedDays.length - 1];
+
+                if(booking.paymentStatus === "completed") {
+                    if (currentDate < firstBookedDay) {
+                        // Booking is in the future
+                        booking.bookingStatus = 'upcoming';
+                    } else if (currentDate >= firstBookedDay && currentDate <= lastBookedDay) {
+                        // Booking is currently in-progress
+                        booking.bookingStatus = 'in-progress';
+                    } else if (currentDate > lastBookedDay) {
+                        // Booking is completed
+                        booking.bookingStatus = 'completed';
+                    }
+                }
+            }
 
         const formattedBookings = bookings.map(booking => ({
             id: booking._id,
-            invoiceId: booking.invoiceId,  
+            transactionId: booking.invoiceId, 
+            bookingId: booking.invoiceId,
             date: formatDate(booking.createdAt),
-            description: `${booking.listing.propertyId} - ${booking.listing.propertyName} (Room ${booking.listing.propertyLocation.apartmentNumber})`,
-            spaceUserName: booking.user.firstName,
+            spaceName: booking.listing.propertyName,
             totalNights: booking.totalNight,
-            amount: booking.totalIncuredChargeAfterDiscount 
+            spaceUserName: booking.user.firstName,
+            amountEarned: booking.listing.chargePerNightWithout10Percent * booking.totalNight ,
+            status: booking.bookingStatus
         }));
 
         const withdrawals = await Withdrawal.find({
@@ -49,12 +81,12 @@ export const spaceOwnerGetWallet = asyncHandler(async (req, res) => {
 
         const formattedWithdrawals = withdrawals.map((withdrawal) => ({
             id: withdrawal._id,
-            invoiceId: withdrawal.paystack_id,
+            payoutId: withdrawal.paystack_id,
+            invoiceId: withdrawal.paystack_id,  
             date: formatDate(withdrawal.createdAt),
-            description: withdrawal.reason,
+            amountWithdrawn: withdrawal.amount,
+            withdrawanTo: "still wait",
             status: withdrawal.status,
-            amount: withdrawal.amount,
-            accountName: withdrawal.user.firstName + " " + withdrawal.user.lastName
         }))
 
         return res.status(200).json({
@@ -65,8 +97,8 @@ export const spaceOwnerGetWallet = asyncHandler(async (req, res) => {
                     availableBalance: walletMetrics.currentBalance,
                     totalEarnings: walletMetrics.totalEarned
                 },
-                withdrawals: formattedWithdrawals,
-                bookings: formattedBookings
+                bookings: formattedBookings,
+                withdrawals: formattedWithdrawals
             }
         });
     } catch (error) {
@@ -701,9 +733,9 @@ export const getTransactionsForSpaceUsersWallet = asyncHandler(async (req, res) 
 
             const formattedFundingHistory = topUps.map((topUp) => ({
                 id: topUp._id,
-                invoiceId: topUp.invoiceId,
+                topUpId: topUp.invoiceId,
+                transactionId: topUp.invoiceId,
                 date: formatDateForSUTransactionHistory(topUp.updatedAt),
-                description: "Wallet topUp",
                 amount: topUp.amount_to_fund,
                 paymentMethod: topUp.mode_of_funding,
                 paymentStatus: topUp.payment_status
@@ -716,7 +748,44 @@ export const getTransactionsForSpaceUsersWallet = asyncHandler(async (req, res) 
                 totalBookings: topUps.length,
                 data: formattedFundingHistory
             });
-        } else {
+        }
+        
+        if(filter === "refunds") {
+
+            console.log("No refund available at the moment".red)
+            return res.status(500).json({
+                success: false,
+                message: "No refund available at the moment",
+                data: null
+            })
+            // topUps = await FundingHistory.find({ user: req.user._id }).sort({ createdAt: -1 });
+
+            // if(!topUps || topUps.lenght < 1 ) {
+            //     console.log("No top up history available at the moment".red)
+            //     return res.status(200).json({
+            //         success: true,
+            //         message: "No top up history available at the moment"
+            //     })
+            // }
+
+            // const formattedFundingHistory = topUps.map((topUp) => ({
+            //     id: topUp._id,
+            //     topUpId: topUp.invoiceId,
+            //     transactionId: topUp.invoiceId,
+            //     date: formatDateForSUTransactionHistory(topUp.updatedAt),
+            //     amount: topUp.amount_to_fund,
+            //     paymentMethod: topUp.mode_of_funding,
+            //     paymentStatus: topUp.payment_status
+            // }));
+
+            // console.log("All wallet fundings returned".cyan)
+            // return res.status(200).json({
+            //     success: true,
+            //     message: "All wallet fundings successfully retrieved",
+            //     totalBookings: topUps.length,
+            //     data: formattedFundingHistory
+            // });
+        }else {
             console.log("Invalid filter provided")
             return res.status(500).json({
                 success: false,

@@ -63,6 +63,9 @@ const withdrawalSchema = new mongoose.Schema({
     otp: { 
         type: String 
     },
+    withdrawnTo: {
+        type: String,
+    },
     paystack_createdAt: { 
         type: Date, 
         default: Date.now 
