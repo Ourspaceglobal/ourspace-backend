@@ -68,12 +68,22 @@ export const checkAvailability = asyncHandler(async (req, res) => {
             checkInToCheckOutDates.push(d.toISOString().split('T')[0]);
         }
 
+        console.log("Total booking days: ",checkInToCheckOutDates.length)
+
         // Fetch listing details
         const listing = await Listing.findById(listingId);
 
         if (!listing) {
             console.warn("Listing cannot be found")
             return res.status(404).json({ success: false, message: "Listing not found" });
+        }
+
+        if(checkInToCheckOutDates.length < listing.minimumDays){
+            console.warn(`Listing is available for a minimum of ${listing.minimumDays}`)
+            return res.status(400).json({
+                success: false,
+                message: `Listing is available for a minimum of ${listing.minimumDays}`
+            })
         }
 
         const { availability = [], calendar, maximumGuestNumber } = listing;
