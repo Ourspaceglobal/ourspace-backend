@@ -8,6 +8,7 @@ import Message from '../models/messageModel.js';
 import { sendSuccessfulBookingMailToSpaceOwner, sendSuccessfulPaymentMail } from '../utils/authUtils.js';
 import { formatAmount, formatDate, formatDateWithoutTime } from '../utils/helperFunction.js';
 import Wallet from '../models/walletModel.js';
+import { validateBookingAvailability } from '../utils/availabilityHelper.js';
 
 function generateInvoiceId() {
     const randomDigits = Array.from({ length: 8 }, () => Math.floor(Math.random() * 10)).join('');
@@ -20,7 +21,6 @@ export const checkAvailability = asyncHandler(async (req, res) => {
     const { listingId } = req.params;
     const { checkIn, checkOut, spaceUsers } = req.body;
 
-    // Validate missing fields
     const requiredFields = { listingId, checkIn, checkOut, spaceUsers };
     const missingFields = Object.entries(requiredFields)
         .filter(([key, value]) => !value)
@@ -29,107 +29,35 @@ export const checkAvailability = asyncHandler(async (req, res) => {
     if (missingFields.length > 0) {
         return res.status(400).json({
             success: false,
-            message: `Missing the following field(s): ${missingFields.join(', ')}`,
+            message: `Missing the following field(s): ${missingFields.join(", ")}`,
         });
     }
 
     try {
-        // Parse dates
         const checkInDate = new Date(checkIn);
         const checkOutDate = new Date(checkOut);
-        const currentDate = new Date();
-        currentDate.setHours(0, 0, 0, 0);
-        // Validate check-out is later than check-in
-        if (checkOutDate < checkInDate) {
-            console.warn("Check-out date cannot be behind check in date.");
-            return res.status(400).json({
-                success: false,
-                message: "Check-out date cannot be behind check in date.",
-            });
+
+        const result = await validateBookingAvailability({
+            listingId,
+            checkInDate,
+            checkOutDate,
+            spaceUsers,
+        });
+
+        if (!result.success) {
+            return res.status(400).json({ success: false, message: result.message, conflictDates: result.conflictDates });
         }
 
-        // Validate no dates are in the past
-        if (checkInDate < currentDate || checkOutDate < currentDate) {
-            console.warn("One or more selected dates are in the past".yellow);
-
-            const pastDates = [];
-            if (checkInDate < currentDate) pastDates.push("checkIn");
-            if (checkOutDate < currentDate) pastDates.push("checkOut");
-
-            return res.status(400).json({
-                success: false,
-                message: `The following dates are in the past and cannot be used for booking: ${pastDates.join(", ")}`,
-            });
-        }
-
-        // Generate the array of dates between checkIn and checkOut
-        const checkInToCheckOutDates = [];
-        for (let d = new Date(checkInDate); d <= checkOutDate; d.setDate(d.getDate() + 1)) {
-            checkInToCheckOutDates.push(d.toISOString().split('T')[0]);
-        }
-
-        console.log("Total booking days: ",checkInToCheckOutDates.length)
-
-        // Fetch listing details
-        const listing = await Listing.findById(listingId);
-
-        if (!listing) {
-            console.warn("Listing cannot be found")
-            return res.status(404).json({ success: false, message: "Listing not found" });
-        }
-
-        if(checkInToCheckOutDates.length < listing.minimumDays){
-            console.warn(`Listing is available for a minimum of ${listing.minimumDays}`)
-            return res.status(400).json({
-                success: false,
-                message: `Listing is available for a minimum of ${listing.minimumDays}`
-            })
-        }
-
-        const { availability = [], calendar, maximumGuestNumber } = listing;
-        const { unavailableDays } = calendar;
-
-        // Check listing availability
-        if (Array.isArray(availability) && availability.length > 0) {
-            const unavailableDates = checkInToCheckOutDates.filter(date => !availability.includes(date));
-            if (unavailableDates.length > 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: `Listing is not available for the following dates: ${unavailableDates.join(", ")}`,
-                });
-            }
-        }
-
-        // Check for conflicts with unavailable days
-        const conflictDates = checkInToCheckOutDates.filter(date => unavailableDays.includes(date));
-        if (conflictDates.length > 0) {
-            return res.status(400).json({
-                success: false,
-                message: `Listing is unavailable for the following dates: ${conflictDates.join(", ")}`,
-                bookedDates: conflictDates,
-            });
-        }
-
-        // Check maximum guests
-        if (spaceUsers > maximumGuestNumber) {
-            return res.status(400).json({
-                success: false,
-                message: `The number of guests exceeds the maximum allowed. Maximum allowed is ${maximumGuestNumber}.`,
-            });
-        }
-
-        // If all checks pass, return success
-        console.log("Listing is available for booking".rainbow)
         res.status(200).json({
             success: true,
-            message: "Listing is available for booking",
-            availableDates: checkInToCheckOutDates,
+            message: result.message,
+            availableDates: result.availableDates,
         });
     } catch (error) {
         console.error(`Error checking availability: ${error.message}`.red);
         res.status(500).json({
             success: false,
-            message: "An error occurred while checking availability",
+            message: "An error occurred while checking availability.",
         });
     }
 });
@@ -144,27 +72,27 @@ if (process.env.NODE_ENV === "development"){
 export const initializeTransaction = asyncHandler(async (req, res) => {
     console.log("Initializing Paystack payment...".green);
 
-    const userId = req.user._id
+    const userId = req.user._id;
 
     const {
-        email, callBackUrl,listingId, newBookedDays,
+        email, callBackUrl, listingId, newBookedDays,
         firstName, lastName, phoneNumber, bookingForSomeone, totalGuest, discount
     } = req.body;
 
     const requiredFields = {
         email,
-        callBackUrl, 
-        listingId, 
-        newBookedDays, 
-        firstName, 
-        lastName, 
-        phoneNumber, 
+        callBackUrl,
+        listingId,
+        newBookedDays,
+        firstName,
+        lastName,
+        phoneNumber,
         totalGuest
     };
 
     const missingFields = Object.entries(requiredFields)
-    .filter(([key, value]) => !value)
-    .map(([key]) => key);
+        .filter(([key, value]) => !value)
+        .map(([key]) => key);
 
     if (missingFields.length > 0) {
         console.log("Missing fields:", missingFields.join(', ').red);
@@ -174,10 +102,9 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
         });
     }
 
-    const uniqueBookedDays = newBookedDays.length === 2 && newBookedDays[0] === newBookedDays[1] 
-    ? [newBookedDays[0]] // Only keep one if both dates are the same
-    : newBookedDays;
-    
+    const uniqueBookedDays = newBookedDays.length === 2 && newBookedDays[0] === newBookedDays[1]
+        ? [newBookedDays[0]] // Only keep one if both dates are the same
+        : newBookedDays;
 
     // Retrieve listing from database
     const listing = await Listing.findById(listingId).populate('user');
@@ -190,26 +117,34 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
         });
     }
 
-    const listingCharge = listing.chargePerNight
-    const totalNights = uniqueBookedDays.length
-    const amountIncurred = listingCharge * totalNights
-    const totalAmountIncured = amountIncurred
-    const listingDiscount = listing.discount
+    const checkInDate = new Date(uniqueBookedDays[0]);
+    const checkOutDate = new Date(uniqueBookedDays[uniqueBookedDays.length - 1]);
 
-    const amountInKobo = totalAmountIncured * 100;
+    // Validate booking availability
+    const availabilityCheck = await validateBookingAvailability({
+        listingId,
+        checkInDate,
+        checkOutDate,
+        spaceUsers: totalGuest
+    });
 
-    const conflictingDates = listing.calendar.unavailableDays.filter(date => uniqueBookedDays.includes(date));
-
-    if (conflictingDates.length > 0) {
-        console.log("Some of the selected dates are already booked".red)
+    if (!availabilityCheck.success) {
         return res.status(400).json({
             success: false,
-            message: 'Some of the selected dates are already booked.',
-            data: { conflictingDates }
+            message: availabilityCheck.message,
+            conflictDates: availabilityCheck.conflictDates || []
         });
     }
 
+    // Calculate transaction details
+    const listingCharge = listing.chargePerNight;
+    const totalNights = uniqueBookedDays.length;
+    const amountIncurred = listingCharge * totalNights;
+    const totalAmountIncured = amountIncurred;
+    const amountInKobo = totalAmountIncured * 100;
+
     try {
+        // Initialize transaction with Paystack
         const response = await axios.post(
             'https://api.paystack.co/transaction/initialize',
             {
@@ -229,14 +164,14 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
         );
 
         const { authorization_url, access_code, reference } = response.data.data;
-
         const callBackWithReference = `${callBackUrl}?reference=${reference}`;
 
+        // Save booking in database
         const newBooking = await Booking.create({
             user: userId,
             listing: listingId,
             spaceOwnerId: listing.user._id,
-            paymentType: "paystack",
+            paymentType: "bank-payment",
             paymentStatus: "awaiting-payment",
             bookingStatus: 'awaiting-payment',
             paystackRef: reference,
@@ -245,7 +180,7 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
             paystackPaymentStatus: "pending",
             firstName,
             lastName,
-            email, 
+            email,
             phoneNumber,
             bookingForSomeone,
             bookedDays: uniqueBookedDays,
@@ -255,11 +190,9 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
             totalIncuredCharge: totalAmountIncured,
             totalIncuredChargeAfterDiscount: totalAmountIncured,
             discount: discount || 0
-        }); 
-        await newBooking.save()
-        
+        });
 
-        console.log("New booking successfully initiated".cyan)
+        console.log("New booking successfully initiated".cyan);
         res.status(200).json({
             success: true,
             message: `New booking successfully initiated`,
@@ -271,7 +204,6 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
                 chargePerNight: listingCharge,
                 totalNights: totalNights,
                 totalIncuredAmount: totalAmountIncured
-
             },
         });
     } catch (error) {
@@ -282,6 +214,7 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
         });
     }
 });
+
 
 export const handleWebhook = async (req, res) => {
     const event = req.body;
@@ -568,18 +501,18 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
 
     const requiredFields = {
         email,
-        listingId, 
-        newBookedDays, 
-        firstName, 
-        lastName, 
-        phoneNumber, 
+        listingId,
+        newBookedDays,
+        firstName,
+        lastName,
+        phoneNumber,
         totalGuest
     };
 
     const missingFields = Object.entries(requiredFields)
         .filter(([key, value]) => !value)
         .map(([key]) => key);
-    
+
     if (missingFields.length > 0) {
         console.log("Missing fields:", missingFields.join(', ').red);
         return res.status(400).json({
@@ -589,6 +522,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
     }
 
     try {
+        // Ensure user has a wallet
         let wallet = await Wallet.findOne({ user: userId });
 
         if (!wallet) {
@@ -596,16 +530,16 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
                 user: userId,
                 userEmail: req.user.email,
                 userType: req.user.userType,
-                currentBalance: 0, 
+                currentBalance: 0,
                 allTimeFunding: 0,
             });
             await wallet.save();
             console.log("New wallet created for user".yellow);
         }
-    
-        const uniqueBookedDays = newBookedDays.length === 2 && newBookedDays[0] === newBookedDays[1] 
-        ? [newBookedDays[0]] // Only keep one if both dates are the same
-        : newBookedDays;
+
+        const uniqueBookedDays = newBookedDays.length === 2 && newBookedDays[0] === newBookedDays[1]
+            ? [newBookedDays[0]] // Only keep one if both dates are the same
+            : newBookedDays;
 
         const listing = await Listing.findById(listingId).populate('user');
         if (!listing) {
@@ -616,22 +550,30 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             });
         }
 
-        // Calculate total incurred charge
-        const listingChargePerNightWith10Percent = listing.chargePerNight
-        const totalNights = uniqueBookedDays.length
-        const amountIncurred = listingChargePerNightWith10Percent * totalNights
-        const totalAmountIncuredWithTotalNightsAnd2000Charges = amountIncurred
+        // Validate booking availability
+        const checkInDate = new Date(uniqueBookedDays[0]);
+        const checkOutDate = new Date(uniqueBookedDays[uniqueBookedDays.length - 1]);
 
-        // Check for conflicting dates
-        const conflictingDates = listing.calendar.unavailableDays.filter(date => newBookedDays.includes(date));
-        if (conflictingDates.length > 0) {
-            console.log("Some of the selected dates are already booked".red);
+        const availabilityCheck = await validateBookingAvailability({
+            listingId,
+            checkInDate,
+            checkOutDate,
+            spaceUsers: totalGuest
+        });
+
+        if (!availabilityCheck.success) {
             return res.status(400).json({
                 success: false,
-                message: 'Some of the selected dates are already booked.',
-                data: { conflictingDates }
+                message: availabilityCheck.message,
+                conflictDates: availabilityCheck.conflictDates || []
             });
         }
+
+        // Calculate total incurred charge
+        const listingChargePerNightWith10Percent = listing.chargePerNight;
+        const totalNights = uniqueBookedDays.length;
+        const amountIncurred = listingChargePerNightWith10Percent * totalNights;
+        const totalAmountIncuredWithTotalNightsAnd2000Charges = amountIncurred;
 
         // Check if wallet balance is enough
         if (wallet.currentBalance < totalAmountIncuredWithTotalNightsAnd2000Charges) {
@@ -672,7 +614,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
         // Update listing with booked days
         listing.calendar.bookedDays = [...listing.calendar.bookedDays, ...uniqueBookedDays];
         if (!listing.propertyUsers.includes(userId)) {
-            listing.propertyUsers.push(userId); 
+            listing.propertyUsers.push(userId);
         }
         await listing.save();
 
@@ -680,15 +622,15 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
 
         // Update space owner's wallet
         let spaceOwnerWallet = await Wallet.findOne({ user: listing.user._id });
-        const listingChargePerNightWithout10PercentWithTotalNight = listing.chargePerNightWithout10Percent * uniqueBookedDays.length
+        const listingChargePerNightWithout10PercentWithTotalNight = listing.chargePerNightWithout10Percent * uniqueBookedDays.length;
 
         if (!spaceOwnerWallet) {
             spaceOwnerWallet = new Wallet({
                 user: listing.user._id,
                 userEmail: listing.user.email,
                 userType: listing.user.userType,
-                totalEarned: listingChargePerNightWithout10PercentWithTotalNight,  
-                currentBalance: listingChargePerNightWithout10PercentWithTotalNight, 
+                totalEarned: listingChargePerNightWithout10PercentWithTotalNight,
+                currentBalance: listingChargePerNightWithout10PercentWithTotalNight,
                 totalWithdrawn: 0
             });
         } else {
@@ -711,7 +653,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             sender: listing.user._id,
             receiver: req.user._id,
             listing: listingId,
-            propertyUserId: req.user._id, 
+            propertyUserId: req.user._id,
             content: `Your payment of ₦${formatAmount(totalAmountIncuredWithTotalNightsAnd2000Charges)} has been confirmed and your booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
         });
 
@@ -733,7 +675,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             totalNights: newBooking.totalNight,
             totalIncuredCharge: newBooking.totalIncuredCharge,
             createdAt: formatDate(newBooking.updatedAt)
-        }
+        };
 
         res.status(200).json({
             success: true,
