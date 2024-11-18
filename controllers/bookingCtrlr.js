@@ -537,9 +537,22 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             console.log("New wallet created for user".yellow);
         }
 
-        const uniqueBookedDays = newBookedDays.length === 2 && newBookedDays[0] === newBookedDays[1]
-            ? [newBookedDays[0]] // Only keep one if both dates are the same
-            : newBookedDays;
+        // Generate booked days excluding the checkout date
+        const generateBookedDays = (checkInDate, checkOutDate) => {
+            const bookedDays = [];
+            let currentDate = new Date(checkInDate);
+
+            // Loop until the day before checkOutDate
+            while (currentDate < new Date(checkOutDate)) {
+                bookedDays.push(new Date(currentDate).toISOString().split('T')[0]); // Add in YYYY-MM-DD format
+                currentDate.setDate(currentDate.getDate() + 1); // Move to the next day
+            }
+
+            return bookedDays;
+        };
+
+        // Ensure that the bookedDays include all dates within the range except the checkout date
+        const uniqueBookedDays = generateBookedDays(uniqueBookedDays[0], uniqueBookedDays[uniqueBookedDays.length - 1]);
 
         const listing = await Listing.findById(listingId).populate('user');
         if (!listing) {
@@ -571,9 +584,8 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
 
         // Calculate total incurred charge
         const listingChargePerNightWith10Percent = listing.chargePerNight;
-        const totalNights = uniqueBookedDays.length;
+        const totalNights = uniqueBookedDays.length - 1;
         const amountIncurred = listingChargePerNightWith10Percent * totalNights;
-        const totalAmountIncuredWithTotalNightsAnd2000Charges = amountIncurred;
 
         // Check if wallet balance is enough
         if (wallet.currentBalance < totalAmountIncuredWithTotalNightsAnd2000Charges) {
@@ -585,7 +597,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
         }
 
         // Deduct balance and save
-        wallet.currentBalance -= totalAmountIncuredWithTotalNightsAnd2000Charges;
+        wallet.currentBalance -= amountIncurred;
         await wallet.save();
 
         // Create new booking
@@ -605,8 +617,8 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             totalGuest,
             chargePerNight: listingChargePerNightWith10Percent,
             totalNight: totalNights,
-            totalIncuredCharge: totalAmountIncuredWithTotalNightsAnd2000Charges,
-            totalIncuredChargeAfterDiscount: totalAmountIncuredWithTotalNightsAnd2000Charges - (discount || 0),
+            totalIncuredCharge: amountIncurred,
+            totalIncuredChargeAfterDiscount: amountIncurred - (discount || 0),
             discount: discount || 0,
             bookingStatus: "upcoming"
         });
@@ -646,7 +658,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             user: userId,
             listing: listingId,
             title: listing.propertyName,
-            subTitle: `Your payment of ₦${formatAmount(totalAmountIncuredWithTotalNightsAnd2000Charges)} has been confirmed and your booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
+            subTitle: `Your payment of ₦${formatAmount(amountIncurred)} has been confirmed and your booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
         });
 
         await Message.create({
@@ -654,7 +666,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             receiver: req.user._id,
             listing: listingId,
             propertyUserId: req.user._id,
-            content: `Your payment of ₦${formatAmount(totalAmountIncuredWithTotalNightsAnd2000Charges)} has been confirmed and your booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
+            content: `Your payment of ₦${formatAmount(amountIncurred)} has been confirmed and your booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
         });
 
         console.log("Notification and message created successfully.".green);
