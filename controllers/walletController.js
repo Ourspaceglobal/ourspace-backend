@@ -68,10 +68,10 @@ export const spaceOwnerGetWallet = asyncHandler(async (req, res) => {
             transactionId: booking.invoiceId, 
             bookingId: booking.invoiceId,
             date: formatDate(booking.createdAt),
-            spaceName: booking.listing.propertyName,
+            spaceName: booking.listing?.propertyName || "null",
             totalNights: booking.totalNight,
             spaceUserName: booking.user.firstName,
-            amountEarned: booking.listing.chargePerNightWithout10Percent * booking.totalNight ,
+            amountEarned: booking.listing?.chargePerNightWithout10Percent * booking.totalNight || "null",
             status: booking.bookingStatus
         }));
 
