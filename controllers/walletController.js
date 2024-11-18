@@ -703,7 +703,7 @@ export const getTransactionsForSpaceUsersWallet = asyncHandler(async (req, res) 
                 invoiceId: booking.invoiceId,
                 bookingId: booking.invoiceId,
                 date: formatDateForSUTransactionHistory(booking.updatedAt),  
-                spaceName: booking.listing.propertyName,
+                spaceName: booking.listing?.propertyName || "null",
                 totalNights: booking.bookedDays.length,
                 chargePerNight: booking.listing.chargePerNight,
                 amount: booking.chargePerNight * booking.bookedDays.length,

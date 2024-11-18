@@ -736,7 +736,7 @@ export const spaceOwnerFetchBookingHistoryForALisitng = asyncHandler(async (req,
         let bookings = await Booking.find(filter)
             .populate('user')
             .populate('listing')
-            .sort({ date: -1 });
+            .sort({ updatedAt: -1 });
 
         const currentDate = new Date().toISOString().split('T')[0];
 
