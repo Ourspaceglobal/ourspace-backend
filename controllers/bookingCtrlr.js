@@ -551,8 +551,12 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             return bookedDays;
         };
 
+        // Use newBookedDays from the request to calculate the range
+        const checkInDate = new Date(newBookedDays[0]);
+        const checkOutDate = new Date(newBookedDays[newBookedDays.length - 1]);
+
         // Ensure that the bookedDays include all dates within the range except the checkout date
-        const uniqueBookedDays = generateBookedDays(uniqueBookedDays[0], uniqueBookedDays[uniqueBookedDays.length - 1]);
+        const uniqueBookedDays = generateBookedDays(checkInDate, checkOutDate);
 
         const listing = await Listing.findById(listingId).populate('user');
         if (!listing) {
@@ -564,9 +568,6 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
         }
 
         // Validate booking availability
-        const checkInDate = new Date(uniqueBookedDays[0]);
-        const checkOutDate = new Date(uniqueBookedDays[uniqueBookedDays.length - 1]);
-
         const availabilityCheck = await validateBookingAvailability({
             listingId,
             checkInDate,
@@ -584,11 +585,11 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
 
         // Calculate total incurred charge
         const listingChargePerNightWith10Percent = listing.chargePerNight;
-        const totalNights = uniqueBookedDays.length - 1;
+        const totalNights = uniqueBookedDays.length; // Total days excluding the checkout day
         const amountIncurred = listingChargePerNightWith10Percent * totalNights;
 
         // Check if wallet balance is enough
-        if (wallet.currentBalance < totalAmountIncuredWithTotalNightsAnd2000Charges) {
+        if (wallet.currentBalance < amountIncurred) {
             console.log("Insufficient wallet funds".red);
             return res.status(400).json({
                 success: false,
@@ -634,7 +635,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
 
         // Update space owner's wallet
         let spaceOwnerWallet = await Wallet.findOne({ user: listing.user._id });
-        const listingChargePerNightWithout10PercentWithTotalNight = listing.chargePerNightWithout10Percent * uniqueBookedDays.length;
+        const listingChargePerNightWithout10PercentWithTotalNight = listing.chargePerNightWithout10Percent * totalNights;
 
         if (!spaceOwnerWallet) {
             spaceOwnerWallet = new Wallet({
@@ -658,7 +659,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             user: userId,
             listing: listingId,
             title: listing.propertyName,
-            subTitle: `Your payment of ₦${formatAmount(amountIncurred)} has been confirmed and your booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
+            subTitle: `Your payment of ₦${formatAmount(amountIncurred)} has been confirmed and your booking is successful for ${uniqueBookedDays.length} day(s) at ${listing.propertyName}`,
         });
 
         await Message.create({
@@ -666,7 +667,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             receiver: req.user._id,
             listing: listingId,
             propertyUserId: req.user._id,
-            content: `Your payment of ₦${formatAmount(amountIncurred)} has been confirmed and your booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
+            content: `Your payment of ₦${formatAmount(amountIncurred)} has been confirmed and your booking is successful for ${uniqueBookedDays.length} day(s) at ${listing.propertyName}`,
         });
 
         console.log("Notification and message created successfully.".green);
@@ -703,6 +704,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
         });
     }
 });
+
 
 export const cancelBooking = asyncHandler(async(req, res)=> {
     console.log("Cancelling booking".yellow)
