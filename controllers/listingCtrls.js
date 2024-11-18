@@ -257,7 +257,7 @@ const createListing = asyncHandler(async (req, res) => {
     console.log("New Listing successfully created".magenta);
     return res.status(201).json({
       success: true,
-      message: "You've successfully created a new listing",
+      message: "You've successfully submitted a new listing for moderation",
       data: newListing
     });
   } catch (error) {

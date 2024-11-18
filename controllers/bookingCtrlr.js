@@ -20,8 +20,8 @@ export const checkAvailability = asyncHandler(async (req, res) => {
     const { listingId } = req.params;
     const { checkIn, checkOut, spaceUsers } = req.body;
 
+    // Validate missing fields
     const requiredFields = { listingId, checkIn, checkOut, spaceUsers };
-
     const missingFields = Object.entries(requiredFields)
         .filter(([key, value]) => !value)
         .map(([key]) => key);
@@ -34,25 +34,52 @@ export const checkAvailability = asyncHandler(async (req, res) => {
     }
 
     try {
-        const listing = await Listing.findById(listingId);
-
-        if (!listing) {
-            return res.status(404).json({ success: false, message: "Listing not found" });
-        }
-
-        const { availability = [], calendar, maximumGuestNumber } = listing; // Default empty array if availability is undefined
-        const { unavailableDays } = calendar;
-
+        // Parse dates
         const checkInDate = new Date(checkIn);
         const checkOutDate = new Date(checkOut);
+        const currentDate = new Date();
+        currentDate.setHours(0, 0, 0, 0);
+        // Validate check-out is later than check-in
+        if (checkOutDate < checkInDate) {
+            console.warn("Check-out date cannot be behind check in date.");
+            return res.status(400).json({
+                success: false,
+                message: "Check-out date cannot be behind check in date.",
+            });
+        }
 
-        // Generate the array of dates from checkIn to checkOut
+        // Validate no dates are in the past
+        if (checkInDate < currentDate || checkOutDate < currentDate) {
+            console.warn("One or more selected dates are in the past".yellow);
+
+            const pastDates = [];
+            if (checkInDate < currentDate) pastDates.push("checkIn");
+            if (checkOutDate < currentDate) pastDates.push("checkOut");
+
+            return res.status(400).json({
+                success: false,
+                message: `The following dates are in the past and cannot be used for booking: ${pastDates.join(", ")}`,
+            });
+        }
+
+        // Generate the array of dates between checkIn and checkOut
         const checkInToCheckOutDates = [];
         for (let d = new Date(checkInDate); d <= checkOutDate; d.setDate(d.getDate() + 1)) {
             checkInToCheckOutDates.push(d.toISOString().split('T')[0]);
         }
 
-        // Check if the listing is available (if availability is enforced)
+        // Fetch listing details
+        const listing = await Listing.findById(listingId);
+
+        if (!listing) {
+            console.warn("Listing cannot be found")
+            return res.status(404).json({ success: false, message: "Listing not found" });
+        }
+
+        const { availability = [], calendar, maximumGuestNumber } = listing;
+        const { unavailableDays } = calendar;
+
+        // Check listing availability
         if (Array.isArray(availability) && availability.length > 0) {
             const unavailableDates = checkInToCheckOutDates.filter(date => !availability.includes(date));
             if (unavailableDates.length > 0) {
@@ -63,7 +90,7 @@ export const checkAvailability = asyncHandler(async (req, res) => {
             }
         }
 
-        // Check for conflicts with unavailable days (union of booked and blocked days)
+        // Check for conflicts with unavailable days
         const conflictDates = checkInToCheckOutDates.filter(date => unavailableDays.includes(date));
         if (conflictDates.length > 0) {
             return res.status(400).json({
@@ -73,6 +100,7 @@ export const checkAvailability = asyncHandler(async (req, res) => {
             });
         }
 
+        // Check maximum guests
         if (spaceUsers > maximumGuestNumber) {
             return res.status(400).json({
                 success: false,
@@ -80,20 +108,21 @@ export const checkAvailability = asyncHandler(async (req, res) => {
             });
         }
 
+        // If all checks pass, return success
+        console.log("Listing is available for booking".rainbow)
         res.status(200).json({
             success: true,
             message: "Listing is available for booking",
             availableDates: checkInToCheckOutDates,
         });
-
     } catch (error) {
-        console.log(`Error checking availability: ${error.message}`.red);
+        console.error(`Error checking availability: ${error.message}`.red);
         res.status(500).json({
             success: false,
             message: "An error occurred while checking availability",
         });
     }
-}); 
+});
 
 let paystackKey;
 if (process.env.NODE_ENV === "development"){
