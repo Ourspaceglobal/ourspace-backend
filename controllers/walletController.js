@@ -11,7 +11,7 @@ import FundingHistory from "../models/fundingModel.js";
 export const spaceOwnerGetWallet = asyncHandler(async (req, res) => {
     console.log("Getting wallet dashboard...".blue);
 
-    let walletMetrics = await Wallet.findOne({user: req.user._id})
+    let walletMetrics = await Wallet.findOne({ user: req.user._id });
 
     if (!walletMetrics) {
         console.log("Wallet not found, using default values".yellow);
@@ -20,36 +20,38 @@ export const spaceOwnerGetWallet = asyncHandler(async (req, res) => {
             totalWithdrawn: 0,
             totalEarned: 0,
         };
-    }   
+    }
 
     try {
         // Fetch bookings and populate related models (listing and user)
-        const bookings = await Booking.find({ 
+        const bookings = await Booking.find({
             spaceOwnerId: req.user._id,
             paymentStatus: "completed"
-         })
+        })
             .populate('listing')
-            .populate('user').sort({updatedAt: -1});
+            .populate('user')
+            .sort({ updatedAt: -1 });
 
-            if(bookings.length < 1) {
-                console.log("No bookings found at the moment".red)
-                    return res.status(200).json({
-                        success: true,
-                        message: "No bookings found at the moment"
-                    })
+        // Delete invalid bookings and prepare formatted data
+        const validBookings = [];
+        for (const booking of bookings) {
+            // Check if the referenced listing or user is null
+            if (!booking.listing || !booking.user) {
+                console.log(
+                    `Deleting invalid booking ${booking._id} because listing or user is missing`.red
+                );
+                await Booking.findByIdAndDelete(booking._id);
+                continue; // Skip this invalid booking
             }
 
             const currentDate = new Date();
 
-            for(let booking in bookings) {
-                if (!Array.isArray(booking.bookedDays) || booking.bookedDays.length === 0) {
-                    console.log(`Booking ${booking._id} has no bookedDays or it's invalid`.yellow);
-                    continue; // Skip this booking
-                }
-                const firstBookedDay = booking.bookedDays[0];
-                const lastBookedDay = booking.bookedDays[booking.bookedDays.length - 1];
+            // Validate bookedDays and update booking status
+            if (Array.isArray(booking.bookedDays) && booking.bookedDays.length > 0) {
+                const firstBookedDay = new Date(booking.bookedDays[0]);
+                const lastBookedDay = new Date(booking.bookedDays[booking.bookedDays.length - 1]);
 
-                if(booking.paymentStatus === "completed") {
+                if (booking.paymentStatus === "completed") {
                     if (currentDate < firstBookedDay) {
                         // Booking is in the future
                         booking.bookingStatus = 'upcoming';
@@ -63,31 +65,34 @@ export const spaceOwnerGetWallet = asyncHandler(async (req, res) => {
                 }
             }
 
-        const formattedBookings = bookings.map(booking => ({
-            id: booking._id,
-            transactionId: booking.invoiceId, 
-            bookingId: booking.invoiceId,
-            date: formatDate(booking.createdAt),
-            spaceName: booking.listing?.propertyName || "null",
-            totalNights: booking.totalNight,
-            spaceUserName: booking.user.firstName,
-            amountEarned: booking.listing?.chargePerNightWithout10Percent * booking.totalNight || "null",
-            status: booking.bookingStatus
-        }));
+            // Add valid bookings to the list
+            validBookings.push({
+                id: booking._id,
+                transactionId: booking.invoiceId,
+                bookingId: booking.invoiceId,
+                date: formatDate(booking.createdAt),
+                spaceName: booking.listing.propertyName || "null",
+                totalNights: booking.totalNight,
+                spaceUserName: booking.user.firstName || "null",
+                amountEarned: booking.listing.chargePerNightWithout10Percent * booking.totalNight || "null",
+                status: booking.bookingStatus
+            });
+        }
 
+        // Fetch and format withdrawals
         const withdrawals = await Withdrawal.find({
             user: req.user._id,
-        }).populate("user").sort({createdAt: -1})
+        }).populate("user").sort({ createdAt: -1 });
 
         const formattedWithdrawals = withdrawals.map((withdrawal) => ({
             id: withdrawal._id,
             payoutId: withdrawal.paystack_id,
-            invoiceId: withdrawal.paystack_id,  
+            invoiceId: withdrawal.paystack_id,
             date: formatDate(withdrawal.createdAt),
             amountWithdrawn: withdrawal.amount,
-            withdrawanTo: "still wait",
+            withdrawnTo: "still wait",
             status: withdrawal.status,
-        }))
+        }));
 
         return res.status(200).json({
             success: true,
@@ -95,17 +100,17 @@ export const spaceOwnerGetWallet = asyncHandler(async (req, res) => {
             data: {
                 wallet: {
                     availableBalance: walletMetrics.currentBalance,
-                    totalEarnings: walletMetrics.totalEarned
+                    totalEarnings: walletMetrics.totalEarned,
                 },
-                bookings: formattedBookings,
-                withdrawals: formattedWithdrawals
-            }
+                bookings: validBookings,
+                withdrawals: formattedWithdrawals,
+            },
         });
     } catch (error) {
-        console.log("Error getting wallet", error);
+        console.error("Error getting wallet:", error);
         return res.status(500).json({
             success: false,
-            message: "Error getting wallet"
+            message: "Error getting wallet",
         });
     }
 });

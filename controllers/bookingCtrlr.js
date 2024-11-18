@@ -102,9 +102,26 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
         });
     }
 
-    const uniqueBookedDays = newBookedDays.length === 2 && newBookedDays[0] === newBookedDays[1]
-        ? [newBookedDays[0]] // Only keep one if both dates are the same
-        : newBookedDays;
+    // Generate booked days excluding the checkout date
+    const generateBookedDays = (checkInDate, checkOutDate) => {
+        const bookedDays = [];
+        let currentDate = new Date(checkInDate);
+
+        // Loop until the day before checkOutDate
+        while (currentDate < new Date(checkOutDate)) {
+            bookedDays.push(new Date(currentDate).toISOString().split('T')[0]); // Add in YYYY-MM-DD format
+            currentDate.setDate(currentDate.getDate() + 1); // Move to the next day
+        }
+
+        return bookedDays;
+    };
+
+    // Use newBookedDays from the request to calculate the range
+    const checkInDate = new Date(newBookedDays[0]);
+    const checkOutDate = new Date(newBookedDays[newBookedDays.length - 1]);
+
+    // Ensure that the bookedDays include all dates within the range except the checkout date
+    const uniqueBookedDays = generateBookedDays(checkInDate, checkOutDate);
 
     // Retrieve listing from database
     const listing = await Listing.findById(listingId).populate('user');
@@ -116,9 +133,6 @@ export const initializeTransaction = asyncHandler(async (req, res) => {
             message: "Listing not found.",
         });
     }
-
-    const checkInDate = new Date(uniqueBookedDays[0]);
-    const checkOutDate = new Date(uniqueBookedDays[uniqueBookedDays.length - 1]);
 
     // Validate booking availability
     const availabilityCheck = await validateBookingAvailability({
@@ -354,7 +368,7 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
 
             let wallet = await Wallet.findOne({ user: listing.user._id });
 
-            // Subtract 10% and 2000 from the total incurred charge
+            // Subtract 10% from the total incurred charge
             const realListingChargePerNIght = listing.chargePerNightWithout10Percent
           
             if (!wallet) {
