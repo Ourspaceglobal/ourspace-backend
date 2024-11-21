@@ -1,5 +1,5 @@
 import express from "express";
-import { protect, spaceOwner } from "../middleware/authMiddleware.js";
+import { protect, spaceOwner, spaceUser } from "../middleware/authMiddleware.js";
 import { downloadBookingPDF, getTransactionsForSpaceUsersWallet, initiateWithdrawal, soGetSingleBookingFromWalletDashboard, spaceOwnerGetBanksAndSavedAccount, spaceOwnerGetWallet, spaceOwnerSaveNewAccountDetails, spaceOwnerVerifyAccountNumber, spaceUserGetSingleTransactionDetails, spaceUserGetWallet, spaceUserInitialiseFundWallet, spaceUserVerifyWalletFunding } from "../controllers/walletController.js";
 
 const router = express.Router()
@@ -39,23 +39,23 @@ router
 
 router
 .route("/su-get-wallet")
-.get(protect, spaceUserGetWallet)
+.get(protect, spaceUser, spaceUserGetWallet)
 
 router
 .route("/su-get-wallet-payments")
-.get(protect, getTransactionsForSpaceUsersWallet)
+.get(protect, spaceUser, getTransactionsForSpaceUsersWallet)
 
 router
 .route("/su-get-single-wallet-transaction")
-.get(protect, spaceUserGetSingleTransactionDetails)
+.get(protect, spaceUser, spaceUserGetSingleTransactionDetails)
 
 router
 .route("/su-initialise-wallet-funding")
-.post(protect, spaceUserInitialiseFundWallet)
+.post(protect, spaceUser, spaceUserInitialiseFundWallet)
 
 router
 .route("/su-verify-wallet-funding")
-.post(protect, spaceUserVerifyWalletFunding)
+.post(protect, spaceUser, spaceUserVerifyWalletFunding)
 
 export default router
 
