@@ -100,14 +100,6 @@ const spaceOwnerGetAllChats = async (req, res) => {
   try {
     const currentUserId = req.user._id;
 
-    // Ensure the user is a space owner
-    if (req.user.userType !== "space-owner") {
-      return res.status(403).json({
-        success: false,
-        message: "Only space owners are allowed"
-      });
-    }
-
     // Find all listings owned by the current space owner
     const listings = await Listing.find({ user: currentUserId }).select('_id');
     const listingIds = listings.map(listing => listing._id);
@@ -538,10 +530,10 @@ const chatWithSpaceOwner = asyncHandler(async (req, res) => {
           }).sort({ createdAt: -1 });
 
           // Check if the last message content starts with "New discussion on"
-          if (lastMessage && lastMessage.content.startsWith("New discussion on")) {
+          if (lastMessage && lastMessage.content.startsWith("   ")) {
               // Delete the last message if it starts with "New discussion on"
               await Message.findByIdAndDelete(lastMessage._id);
-              console.log(`Deleted previous "New discussion on" message with ID: ${lastMessage._id}`.yellow);
+              console.log(`Deleted previous "   " message with ID: ${lastMessage._id}`.yellow);
           }
       }
 
@@ -550,7 +542,7 @@ const chatWithSpaceOwner = asyncHandler(async (req, res) => {
           sender: user._id,
           receiver: listing.user._id,
           listing: listing._id,
-          content: `New discussion on being good for ${listing.propertyName} at ${listing.propertyLocation.city}`
+          content: `   `
       });
 
       console.log("New chat created between space user and owner.".green);
@@ -604,9 +596,7 @@ const chatWithSpaceUser= asyncHandler(async (req, res) => {
               listing: booking.listing._id
           }).sort({ createdAt: -1 });
 
-          // Check if the last message content starts with "New discussion on"
-          if (lastMessage && lastMessage.content.startsWith("New discussion on")) {
-              // Delete the last message if it starts with "New discussion on"
+          if (lastMessage && lastMessage.content.startsWith("   ")) {
               await Message.findByIdAndDelete(lastMessage._id);
               console.log(`Deleted previous "New discussion on" message with ID: ${lastMessage._id}`.yellow);
           }
@@ -617,7 +607,7 @@ const chatWithSpaceUser= asyncHandler(async (req, res) => {
           sender: user._id,
           receiver: booking.user._id,
           listing: booking.listing._id,
-          content: `New discussion on being good for ${booking.listing.propertyName} at ${booking.listing.propertyLocation.city}`
+          content: `   `
       });
 
       console.log("New chat created between space user and owner.".green);
