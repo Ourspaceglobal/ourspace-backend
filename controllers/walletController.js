@@ -693,7 +693,7 @@ export const getTransactionsForSpaceUsersWallet = asyncHandler(async (req, res) 
         let topUps;
 
         if(filter === "bookings") {
-            bookings = await Booking.find({ user: user_id }).populate("listing").sort({ updatedAt: -1 });
+            bookings = await Booking.find({ user: user_id }).populate("listing").sort({ createdAt: -1 });
 
             if(!bookings || bookings.lenght < 1 ) {
                 console.log("No booking history available at the moment".red)
@@ -808,6 +808,7 @@ export const getTransactionsForSpaceUsersWallet = asyncHandler(async (req, res) 
     }
 });
 
+//GET    "/su-get-single-wallet-transaction
 export const spaceUserGetSingleTransactionDetails = asyncHandler(async (req, res) => {
     console.log("Getting a single wallet transaction details for space user".green);
 
