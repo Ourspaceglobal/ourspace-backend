@@ -536,18 +536,18 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
 
     try {
         // Ensure user has a wallet
-        let wallet = await Wallet.findOne({ user: userId });
+        let spaceUserWallet = await Wallet.findOne({ user: userId });
 
-        if (!wallet) {
-            wallet = new Wallet({
+        if (!spaceUserWallet) {
+            spaceUserWallet = new Wallet({
                 user: userId,
                 userEmail: req.user.email,
                 userType: req.user.userType,
                 currentBalance: 0,
                 allTimeFunding: 0,
             });
-            await wallet.save();
-            console.log("New wallet created for user".yellow);
+            await spaceUserWallet.save();
+            console.log("New spaceUserWallet created for user".yellow);
         }
 
         // Generate booked days excluding the checkout date
@@ -566,7 +566,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
 
         // Use newBookedDays from the request to calculate the range
         const checkInDate = new Date(newBookedDays[0]);
-        const checkOutDate = new Date(newBookedDays[newBookedDays.length - 1]);
+        const checkOutDate = new Date(newBookedDays[newBookedDays.length - 1]); //excluding the checkOut date
 
         // Ensure that the bookedDays include all dates within the range except the checkout date
         const uniqueBookedDays = generateBookedDays(checkInDate, checkOutDate);
@@ -597,12 +597,11 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
         }
 
         // Calculate total incurred charge
-        const listingChargePerNightWith10Percent = listing.chargePerNight;
         const totalNights = uniqueBookedDays.length; // Total days excluding the checkout day
-        const amountIncurred = listingChargePerNightWith10Percent * totalNights;
+        const amountIncurred = listing.chargePerNight * totalNights;
 
         // Check if wallet balance is enough
-        if (wallet.currentBalance < amountIncurred) {
+        if (spaceUserWallet.currentBalance < amountIncurred) {
             console.log("Insufficient wallet funds".red);
             return res.status(400).json({
                 success: false,
@@ -611,8 +610,8 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
         }
 
         // Deduct balance and save
-        wallet.currentBalance -= amountIncurred;
-        await wallet.save();
+        spaceUserWallet.currentBalance -= amountIncurred;
+        await spaceUserWallet.save();
 
         // Create new booking
         const newBooking = await Booking.create({
@@ -661,7 +660,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             });
         } else {
             spaceOwnerWallet.totalEarned += listingChargePerNightWithout10PercentWithTotalNight;
-            spaceOwnerWallet.currentBalance = spaceOwnerWallet.totalEarned - spaceOwnerWallet.totalWithdrawn;
+            spaceOwnerWallet.currentBalance = spaceOwnerWallet.currentBalance + listingChargePerNightWithout10PercentWithTotalNight;
         }
         await spaceOwnerWallet.save();
 
