@@ -267,7 +267,7 @@ export const handleWebhook = async (req, res) => {
 };
 
 export const verifyTransaction = asyncHandler(async (req, res) => {
-    console.log("Verifying transaction...".green);
+    console.log("Verifying paystack transaction...".green);
 
     const { reference, listingId } = req.body;
     const userId = req.user;
@@ -364,35 +364,35 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
 
             const listingOwner = listing.user;
 
-            console.log("Updating wallet".blue) 
+            console.log("Updating space owner wallet".blue) 
 
-            let wallet = await Wallet.findOne({ user: listing.user._id });
+            let spaceOwnerWallet = await Wallet.findOne({ user: listing.user._id });
 
             // Subtract 10% from the total incurred charge
-            const realListingChargePerNIght = listing.chargePerNightWithout10Percent
+            const newTotalEarned = booking.totalIncuredChargeAfterDiscount
           
-            if (!wallet) {
-                console.log("No wallet info found, creating a new one".yellow);
+            if (!spaceOwnerWallet) {
+                console.log("No wallet info found, creating a new one and adding new booked amount by space user".yellow);
                 // If no wallet exists, create a new wallet for the user
-                wallet = new Wallet({
+                spaceOwnerWallet = new Wallet({
                     user: listing.user._id,
                     userEmail: listing.user.email,
                     userType: listing.user.userType,
-                    totalEarned: realListingChargePerNIght,  
-                    currentBalance: realListingChargePerNIght, 
+                    totalEarned: newTotalEarned,  
+                    currentBalance: newTotalEarned, 
                     totalWithdrawn: 0
                 });
             } else {
                 // Update the existing wallet
-                const newTotalEarned = wallet.totalEarned + realListingChargePerNIght;
-                const newCurrentBalance = newTotalEarned - wallet.totalWithdrawn;
+                const allTimeEarning = spaceOwnerWallet.totalEarned + newTotalEarned;
+                const newCurrentBalance = newTotalEarned - spaceOwnerWallet.totalWithdrawn;
 
-                wallet.totalEarned = newTotalEarned;
-                wallet.currentBalance = newCurrentBalance;
+                spaceOwnerWallet.totalEarned = allTimeEarning;
+                spaceOwnerWallet.currentBalance = newCurrentBalance;
             }
 
-            await wallet.save();
-            console.log("Wallet successfully updated".green)
+            await spaceOwnerWallet.save();
+            console.log(`space owner Wallet successfully updated: ${spaceOwnerWallet}`.green)
 
             // create a new notification
             await Notification.create({
