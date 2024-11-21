@@ -42,6 +42,30 @@ const protect = asyncHandler(async (req, res, next) => {
   }
 });
 
+const spaceUser = (req, res, next) => {
+  if(req.user && req.user.userType === "space-user") {
+    next();
+  } else {
+    console.log("Only space users are allowed".red)
+    return res.status(403).json({
+      success: false,
+      message: "Access denied, only space users are allowed"
+    })
+  }
+}
+
+const spaceOwner = (req, res, next) => {
+  if(req.user && req.user.userType === "space-owner") {
+    next();
+  } else {
+    console.log("Only space owners are allowed".red)
+    return res.status(403).json({
+      success: false,
+      message: "Access denied, only space owners are allowed"
+    })
+  }
+}
+
 
 // User must be an admin
 const admin = (req, res, next) => {
@@ -74,4 +98,4 @@ const localVariables = (req, res, next) => {
   next();
 };
 
-export { protect, admin, superAdmin, localVariables };
+export { protect, spaceUser, spaceOwner, admin, superAdmin, localVariables };

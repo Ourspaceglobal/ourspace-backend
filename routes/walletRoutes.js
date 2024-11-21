@@ -1,5 +1,5 @@
 import express from "express";
-import { protect } from "../middleware/authMiddleware.js";
+import { protect, spaceOwner } from "../middleware/authMiddleware.js";
 import { downloadBookingPDF, getTransactionsForSpaceUsersWallet, initiateWithdrawal, soGetSingleBookingFromWalletDashboard, spaceOwnerGetBanksAndSavedAccount, spaceOwnerGetWallet, spaceOwnerSaveNewAccountDetails, spaceOwnerVerifyAccountNumber, spaceUserGetSingleTransactionDetails, spaceUserGetWallet, spaceUserInitialiseFundWallet, spaceUserVerifyWalletFunding } from "../controllers/walletController.js";
 
 const router = express.Router()
@@ -7,35 +7,35 @@ const router = express.Router()
 
 router
 .route("/so-get-wallet-dashboard")
-.get(protect, spaceOwnerGetWallet)
+.get(protect,spaceOwner, spaceOwnerGetWallet)
 
 router
 .route("/so-view-payment-invoice")
-.get(protect, soGetSingleBookingFromWalletDashboard)
+.get(protect, spaceOwner, soGetSingleBookingFromWalletDashboard)
 
 router
 .route("/so-download-invoice-as-pdf")
-.get(protect, downloadBookingPDF)
+.get(protect, spaceOwner, downloadBookingPDF)
 
 router
 .route("/so-get-banks-with-saved-accts")
-.get(protect, spaceOwnerGetBanksAndSavedAccount)
+.get(protect, spaceOwner, spaceOwnerGetBanksAndSavedAccount)
 
 router
 .route("/so-verify-account-number")
-.post(protect, spaceOwnerVerifyAccountNumber)
+.post(protect, spaceOwner, spaceOwnerVerifyAccountNumber)
 
 router
 .route("/so-save-new-bank-details")
-.post(protect, spaceOwnerSaveNewAccountDetails)
+.post(protect, spaceOwner, spaceOwnerSaveNewAccountDetails)
 
 router
 .route("/so-save-new-bank-details")
-.post(protect, spaceOwnerSaveNewAccountDetails)
+.post(protect, spaceOwner, spaceOwnerSaveNewAccountDetails)
 
 router
 .route("/so-initiate-withdrawal")
-.post(protect, initiateWithdrawal)
+.post(protect, spaceOwner, initiateWithdrawal)
 
 router
 .route("/su-get-wallet")

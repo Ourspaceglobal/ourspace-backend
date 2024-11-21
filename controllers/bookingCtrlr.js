@@ -313,13 +313,13 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
             });
         }
 
-        if (booking.paystackPaymentStatus === 'success') {
-            console.log("booking has already been verified as successful".bgRed);
-            return res.status(400).json({
-                success: false,
-                message: 'This booking transaction has already been verified as successful.',
-            });
-        }
+        // if (booking.paystackPaymentStatus === 'success') {
+        //     console.log("booking has already been verified as successful".bgRed);
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: 'This booking transaction has already been verified as successful.',
+        //     });
+        // }
 
         const amountPaidToPaystack = paystackKoboAmount / 100;
 
@@ -385,14 +385,13 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
             } else {
                 // Update the existing wallet
                 const allTimeEarning = spaceOwnerWallet.totalEarned + newTotalEarned;
-                const newCurrentBalance = newTotalEarned - spaceOwnerWallet.totalWithdrawn;
+                const newCurrentBalance = spaceOwnerWallet.currentBalance + newTotalEarned;
 
                 spaceOwnerWallet.totalEarned = allTimeEarning;
                 spaceOwnerWallet.currentBalance = newCurrentBalance;
             }
 
             await spaceOwnerWallet.save();
-            console.log(`space owner Wallet successfully updated: ${spaceOwnerWallet}`.green)
 
             // create a new notification
             await Notification.create({

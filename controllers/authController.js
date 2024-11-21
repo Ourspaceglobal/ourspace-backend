@@ -656,7 +656,7 @@ const continueWithGoogle = asyncHandler(async (req, res, next) => {
                 wallet = new Wallet({
                     user: userId,
                     userEmail: payload.email,
-                    userType: "space-owner",
+                    userType: userType,
                     currentBalance: 0, 
                     totalEarned: 0,
                     totalWithdrawn: 0
