@@ -85,6 +85,11 @@ const bookingSchema = new mongoose.Schema({
         required: true,
         min: [0, 'Charge per night cannot be negative.']
     },
+    chargePerNightWithout10Percent: {
+        type: Number,
+        required: true,
+        min: [0, 'Charge per night cannot be negative.']
+    },
 
     totalNight: {
         type: Number,
@@ -96,6 +101,10 @@ const bookingSchema = new mongoose.Schema({
         type: Number,
         required: true,
         min: [0, 'Total incured charge is required.']
+    },
+
+    totalIncuredChargeWithout10Percent: {
+        type: Number,
     },
 
     totalIncuredChargeAfterDiscount: {

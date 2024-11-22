@@ -1,22 +1,22 @@
 import express from "express";
 import { bookWithWallet, checkAvailability, spaceOwnerFetchBookingHistoryForALisitng, initializeTransaction, verifyTransaction } from "../controllers/bookingCtrlr.js";
-import { protect } from "../middleware/authMiddleware.js";
+import { protect, spaceOwner, spaceUser } from "../middleware/authMiddleware.js";
 import { cancelBooking } from "../controllers/profileCtrlr.js";
 
 const router  = express.Router()
 
 router.route("/check-availability/:listingId").post(checkAvailability)
 
-router.route("/paystack/initialise").post(protect, initializeTransaction)
-router.route("/paystack/verify").post(protect, verifyTransaction)
+router.route("/paystack/initialise").post(protect, spaceUser, initializeTransaction)
+router.route("/paystack/verify").post(protect, spaceUser, verifyTransaction)
 
 
 router
 .route("/book-with-wallet")
-.post(protect, bookWithWallet)
+.post(protect, spaceUser, bookWithWallet)
 
 router
 .route("/specific-listing-bookings/:listingId")
-.post(protect, spaceOwnerFetchBookingHistoryForALisitng)
+.post(protect, spaceOwner, spaceOwnerFetchBookingHistoryForALisitng)
 
 export default router 
