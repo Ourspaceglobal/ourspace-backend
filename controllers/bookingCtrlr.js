@@ -671,7 +671,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             user: userId,
             listing: listingId,
             title: listing.propertyName,
-            subTitle: `Your payment of ₦${formatAmount(amountIncurred)} has been confirmed and your booking is successful for ${uniqueBookedDays.length} day(s) at ${listing.propertyName}`,
+            subTitle: `Payment of ₦${formatAmount(amountIncurred)} has been confirmed and booking is successful for ${uniqueBookedDays.length} day(s) at ${listing.propertyName}`,
         });
 
         await Message.create({
@@ -679,7 +679,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             receiver: req.user._id,
             listing: listingId,
             propertyUserId: req.user._id,
-            content: `Your payment of ₦${formatAmount(amountIncurred)} has been confirmed and your booking is successful for ${uniqueBookedDays.length} day(s) at ${listing.propertyName}`,
+            content: `Payment of ₦${formatAmount(amountIncurred)} has been confirmed and booking is successful for ${uniqueBookedDays.length} day(s) at ${listing.propertyName}`,
         });
 
         console.log("Notification and message created successfully.".green);
