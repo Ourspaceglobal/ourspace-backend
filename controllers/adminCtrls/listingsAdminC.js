@@ -5,10 +5,11 @@ import Listing from "../../models/listingModel.js"
 import cloudinaryConfig from '../../uploadUtils/cloudinaryConfig.js';
 import { validateListingRequiredFields } from '../../utils/validateListings.js';
 import sendEmail from '../../utils/sendMail.js';
-import { sendListingApprovedEmail, sendListingRejectedEmail } from '../../utils/authUtils.js';
+import { sendListingApprovedEmail, sendListingRejectedEmail, sendSuccessfulBookingMailToAllSuperAdmin, sendSuccessfulPaymentMail } from '../../utils/authUtils.js';
 import DraftListing from '../../models/draftListingModel.js';
 import User from '../../models/userModel.js';
 import { formatListingData, formatSaveForLaterListingData } from '../../utils/formatListingData.js';
+import Booking from '../../models/bookingModel.js';
 
 const getCoordinates = async (address) => {
     try {
@@ -156,6 +157,7 @@ export const getListingById = asyncHandler(async (req, res) => {
     }
 });
 
+// Admin
 export const updateListingStatus = asyncHandler(async (req, res) => {
     console.log("Updating listing status".yellow);
 
@@ -209,12 +211,46 @@ export const updateListingStatus = asyncHandler(async (req, res) => {
                 });
             }
 
+            if(listing.chargePerNight !== listing.oldChargePerNight){
+              console.log("Sending mail to all current bookings and updating old charge per night".green)
+
+              const listingOwner = await Listing.findById(listingId).populate("user")
+
+              const bookingsInProgress = await Booking.find({
+                spaceOwnerId: listingOwner.user._id,
+                bookingStatus: "in-progress"
+              })
+
+              if(bookingsInProgress.length > 1) {
+                  try {
+                    await Promise.all(
+                      bookingsInProgress.map(async (bookingInProgress) => {
+                          await successfulPriceUpdateEmail(
+                              listingOwner.user.email,
+                              bookingInProgress.listing.propertyName,
+                              bookingInProgress.listing.oldChargePerNight,
+                              bookingInProgress.listing.chargePerNight
+                          );
+                      })
+                    );
+                  } catch (error) {
+                    console.log("Error sending price update email to all space users", error)
+                  }
+              }else {
+                console.log("No booking in progress at the moment".blue)
+              }
+            }
+
             // If no validation errors, update the status to approved and listed
             console.log("Sending email to user for successful approval".blue)
             await sendListingApprovedEmail(to, fullName, listingName, approvalDate)
 
             listing.listingStatus = newListingStatus;
             listing.status = "listed";
+
+            const listingOldPrice = listing.chargePerNight
+            const listingNewPrice = listing.
+            if()
         } else if (newListingStatus === "active") {
             // If marking as active, update the status
             listing.listingStatus = newListingStatus;

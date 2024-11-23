@@ -11,7 +11,7 @@ import { welcomeEmail } from '../email_templates/welcomeMail.js';
 import { successfulPaymentMail } from '../email_templates/successfulPaymentMail.js';
 import { listingRejectedEmail } from '../email_templates/listingRejectionEmail.js';
 import { ListingApprovedMail } from '../email_templates/listingApprovedEmail.js';
-import { successfulBookingMailToSpaceOwner, successfulBookingMailToSuperAdmin } from '../email_templates/successfulBookingMailToSpaceOwner.js';
+import { successfulBookingMailToSpaceOwner, successfulBookingMailToSuperAdmin, successfulPriceUpdateEmail } from '../email_templates/successfulBookingMailToSpaceOwner.js';
 import { formatAmount } from './helperFunction.js';
 
 const hashFunction = async (data) => {
@@ -190,7 +190,7 @@ export const sendSuccessfulPaymentMail = async (email, fullName, apartmentName, 
 
     const htmlContent = await successfulPaymentMail(fullName, apartmentName, totalNight, amountPaid);
 
-    const mailOptions = {
+    const mailOptions = { 
       from: {
         name: "Ourspace",
         address: process.env.EMAIL_USER,
@@ -206,6 +206,7 @@ export const sendSuccessfulPaymentMail = async (email, fullName, apartmentName, 
     throw new Error('Failed to send successful bookings payment email');
   }
 }
+
 export const sendSuccessfulBookingMailToSpaceOwner = async (email, spaceUserName, apartmentName, totalNight, daysBooked, totalPaid) => {
   try {
     const transporter = nodemailer.createTransport({
@@ -268,6 +269,38 @@ export const sendSuccessfulBookingMailToAllSuperAdmin = async (spaceUserName, ap
   } catch (error) {
     console.error('Error sending successful booking email to space owner:', error);
     throw new Error('Error sending successful booking email to space owner');
+  }
+}
+
+export const sendPropertyPriceUpdateToUsers = async (spaceUserEmail, apartmentName, oldChargePerNight, newChargePerNight)=> {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
+      },
+    });
+
+    const htmlContent = await successfulPriceUpdateEmail(spaceUserEmail, apartmentName, oldChargePerNight, newChargePerNight);
+
+    const mailOptions = {
+      from: {
+        name: `OS - Booking Price Update`,
+        address: process.env.EMAIL_USER,
+      },
+      to: spaceUserEmail,
+      subject: `Change In Booking Price: ${newChargePerNight}`,
+      html: htmlContent
+    };
+
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error('Error sending booking price update to space user:', error);
+    throw new Error('Error sending booking price update to space user');
   }
 }
 

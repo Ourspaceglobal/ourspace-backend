@@ -233,7 +233,8 @@ const createListing = asyncHandler(async (req, res) => {
       kitchenPictures,
       facilityPictures,
       otherPictures,
-      propertyType: propertyTypeArray
+      propertyType: propertyTypeArray,
+      oldChargePerNight: formattedData.chargePerNight
     };
 
     if (req.body.listingId) {
@@ -867,7 +868,7 @@ const editListing = asyncHandler(async (req, res) => {
   const listingId = req.params.id;
   const existingListing = await Listing.findById(listingId);
 
-  if (!existingListing) {
+  if (!existingListing) { 
       console.log("Listing not found".red);
       return res.status(404).json({
           success: false,

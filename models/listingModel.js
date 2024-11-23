@@ -99,6 +99,9 @@ const listingsSchema = new mongoose.Schema({
     chargePerNight: {
       type: Number
     },
+    oldChargePerNight: {
+      type: Number
+    },
     chargePerNightWithout10Percent: {
       type: Number
     },

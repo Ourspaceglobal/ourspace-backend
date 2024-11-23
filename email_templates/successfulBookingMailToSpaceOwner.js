@@ -189,3 +189,104 @@ export const successfulBookingMailToSpaceOwner = async (spaceUserName, apartment
       </html>
     `;
   };
+  export const successfulPriceUpdateEmail = async (apartmentName, oldChargePerNight, newChargePerNight) => {
+    return `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+              body {
+                  font-family: Arial, sans-serif;
+                  background-color: #f4f4f4;
+                  margin: 0;
+                  padding: 0;
+                  color: #333;
+              }
+              .email-container {
+                  width: 100%;
+                  max-width: 600px;
+                  margin: 0 auto;
+                  background-color: #ffffff;
+                  padding: 20px;
+                  border-radius: 8px;
+                  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+              }
+              .email-header {
+                  text-align: center;
+                  background-color: #342fc4;
+                  color: white;
+                  padding: 10px;
+                  border-top-left-radius: 8px;
+                  border-top-right-radius: 8px;
+              }
+              .email-body {
+                  padding: 20px;
+                  line-height: 1.6;
+                  color: #555;
+              }
+              .email-footer {
+                  text-align: center;
+                  margin-top: 20px;
+                  font-size: 12px;
+                  color: #777;
+              }
+              .highlight {
+                  color: #342fc4;
+                  font-weight: bold;
+              }
+              .cta-button {
+                  display: inline-block;
+                  margin-top: 20px;
+                  padding: 12px 24px;
+                  background-color: #342fc4;
+                  color: white;
+                  text-decoration: none;
+                  border-radius: 5px;
+                  font-size: 16px;
+                  text-align: center;
+              }
+                  .cta-button-green{
+                  display: inline-block;
+                  margin-top: 20px;
+                  padding: 12px 24px;
+                  background-color: green;
+                  color: white;
+                  text-decoration: none;
+                  border-radius: 5px;
+                  font-size: 16px;
+                  text-align: center;
+              }
+          </style>
+      </head>
+      <body>
+          <div class="email-container">
+              <div class="email-header">
+                  <h2>Property Booking Price Update</h2>
+              </div>
+              <div class="email-body">
+                  <p>Dear super Admin, </p>
+                  <p>We will like to inform you that a booking price chnage has occured on <span class="highlight">${apartmentName}</span>.</p>
+                  <br></br>
+                  <br></br>
+
+                  <p>Please do take note that these price change has no effect on your current bookings, it will only start to take effect starting from new booking</p>
+                  <p><strong>Updated Property Details:</strong></p>
+                  <ul>
+                      <li><strong>Property name:</strong> ${apartmentName}</li>
+                      <li><strong>Old booking Price:</strong> ${oldChargePerNight}</li>
+                      <li><strong>New Booking Price:</strong> #${newChargePerNight}</li>
+                  </ul>
+                  
+                  <a href="mailto:ourspacegloballtd@gmail.com" class="cta-button">Contact Support</a>
+              </div>
+              <div class="email-footer">
+                  <p>Thank you for using ourspace for your shortlet apartment!</p>
+                  <p>&copy; 2024 ourspace. All Rights Reserved.</p>
+              </div>
+          </div>
+      </body>
+      </html>
+    `;
+  };
