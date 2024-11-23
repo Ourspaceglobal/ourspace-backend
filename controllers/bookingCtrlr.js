@@ -404,7 +404,7 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
                     user: userId,
                     listing: listingId,
                     title: listing.propertyName,
-                    subTitle: `Your payment of ₦${formatAmount(amountPaidToPaystack)} has been confirmed and your booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
+                    subTitle: `New payment of ₦${formatAmount(amountPaidToPaystack)} has been confirmed and booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
                 },
             ],
             { session }
@@ -418,7 +418,7 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
                     receiver: userId,
                     listing: listingId,
                     propertyUserId: userId,
-                    content: `Your payment of ₦${formatAmount(amountPaidToPaystack)} has been confirmed and your booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
+                    content: `New payment of ₦${formatAmount(amountPaidToPaystack)} has been confirmed and booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
                 },
             ],
             { session }

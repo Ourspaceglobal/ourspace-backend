@@ -142,7 +142,6 @@ const createListing = asyncHandler(async (req, res) => {
     const formattedData = formatListingData(req);
 
     const chargePerNightWithout10Percent = formattedData.chargePerNight
-    console.log("pure charge per night: ", chargePerNightWithout10Percent)
 
     formattedData.chargePerNight = Math.round(formattedData.chargePerNight * 1.1);
 
@@ -925,6 +924,11 @@ const editListing = asyncHandler(async (req, res) => {
   // Format the listing data using the same logic as createListing
   const formattedData = formatListingData(req);
 
+  const chargePerNightWithout10Percent = formattedData.chargePerNight
+    console.log("pure charge per night: ", chargePerNightWithout10Percent)
+
+    formattedData.chargePerNight = Math.round(formattedData.chargePerNight * 1.1);
+
   let latitude, longitude;
 
   // Fetch coordinates based on the address
@@ -968,6 +972,7 @@ const editListing = asyncHandler(async (req, res) => {
           listingId,
           {
               ...formattedData,
+              chargePerNightWithout10Percent,
               propertyLocation: {
                 ...formattedData.propertyLocation,
                 latitude,
