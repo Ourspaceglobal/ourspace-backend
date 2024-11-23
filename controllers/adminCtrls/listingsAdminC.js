@@ -243,14 +243,6 @@ export const updateListingStatus = asyncHandler(async (req, res) => {
                             title: "Price Change Notification",
                             subTitle: `The nightly charge for ${listing.propertyName} has changed from ₦${listing.oldChargePerNight} to ₦${listing.chargePerNight}. This change will only apply to new bookings and will not affect current active bookings.`,
                           }], { session });
-
-                          // Create in-app chat notification
-                          await Message.create([{
-                            sender: listing.user._id,
-                            receiver: bookingInProgress.user._id,
-                            listing: bookingInProgress.listing._id,
-                            content: `The nightly charge for ${listing.propertyName} has changed from ₦${listing.oldChargePerNight} to ₦${listing.chargePerNight}. This change will only apply to new bookings and will not affect current active bookings.`,
-                          }], { session });
                       })
                   );
               } else {

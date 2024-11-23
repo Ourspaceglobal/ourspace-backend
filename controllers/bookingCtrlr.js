@@ -403,7 +403,7 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
                 {
                     user: userId,
                     listing: listingId,
-                    title: listing.propertyName,
+                    title: `${listing.propertyName} - Booking Successful`,
                     subTitle: `New payment of ₦${formatAmount(amountPaidToPaystack)} has been confirmed and booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
                 },
             ],
@@ -418,7 +418,7 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
                     receiver: userId,
                     listing: listingId,
                     propertyUserId: userId,
-                    content: `New payment of ₦${formatAmount(amountPaidToPaystack)} has been confirmed and booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
+                    content: `New payment of ₦${formatAmount(booking.totalIncuredChargeWithout10Percent)} has been confirmed and booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
                 },
             ],
             { session }
@@ -644,6 +644,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
         // Calculate total incurred charge
         const totalNights = uniqueBookedDays.length; // Total days excluding the checkout day
         const amountIncurred = listing.chargePerNight * totalNights;
+        const amountIncurredWithout10Percent = listing.chargePerNightWithout10Percent * totalNights
 
         // Check if wallet balance is enough
         if (spaceUserWallet.currentBalance < amountIncurred) {
@@ -707,7 +708,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
         }
         await spaceOwnerWallet.save({ session });
 
-        // Create notification
+        // Create notification for space user
         await Notification.create([{
             user: userId,
             listing: listingId,
@@ -721,7 +722,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             receiver: req.user._id,
             listing: listingId,
             propertyUserId: req.user._id,
-            content: `Payment of ₦${formatAmount(amountIncurred)} has been confirmed and booking is successful for ${uniqueBookedDays.length} day(s) at ${listing.propertyName}`,
+            content: `New booking is successful for ${uniqueBookedDays.length} day(s) at ${listing.propertyName}`,
         }], { session });
 
         // Commit the transaction
@@ -770,6 +771,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             totalGuest: newBooking.totalGuest,
             totalNights: newBooking.totalNight,
             totalIncuredCharge: newBooking.totalIncuredCharge,
+            totalIncuredChargeWithout10Percent: newBooking.amountIncurredWithout10Percent,
             createdAt: formatDate(newBooking.updatedAt)
         };
 

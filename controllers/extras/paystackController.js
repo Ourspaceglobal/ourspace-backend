@@ -4,6 +4,8 @@ import Booking from '../../models/bookingModel.js';
 import Listing from '../../models/listingModel.js';
 import asyncHandler from '../../middleware/asyncHandler.js';
 import Notification from '../../models/notificationModel.js';
+import { formatAmount } from '../../utils/helperFunction.js';
+import Message from '../../models/messageModel.js';
 
 export const initializeTransaction = asyncHandler(async (req, res) => {
     console.log("Initializing Paystack payment...".green);
@@ -216,14 +218,12 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
 
         const ourspaceEmail = process.env.OUR_SPACE_EMAIL;
         const maximusEmail = process.env.MAXIMUS_EMAIL;
-         
-        
-        await sendEmail(
-            maximusEmail,
-            "Ourspace bookings payment",
-            `A new payment of #${normalAmount} was made by ${customer.email}.`
-        );
-        console.log("Payment confirmed, and email sent".cyan);
+        // await sendEmail(
+        //     ourspaceEmail,
+        //     "Ourspace bookings payment",
+        //     `A new payment of #${normalAmount} was made by ${customer.email}.`
+        // );
+        // console.log("Payment confirmed, and email sent".cyan);
 
         // Update transaction status to 'success'
         booking.paystackPaymentStatus = 'success';
@@ -251,15 +251,23 @@ export const verifyTransaction = asyncHandler(async (req, res) => {
             const listingOwner = listing.user;
             const displayImage = listingOwner.profilePic.url || '';
 
-            // create a new notification
+            // create a new notification for space user
             await Notification.create({
                 user: userId,
                 listing: listingId,
                 title: listing.propertyName,
-                subTitle: `Your payment of ₦${normalAmount} has been confirmed and your booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
+                subTitle: `Your payment of ₦${formatAmount(normalAmount)} has been confirmed and your booking is successful for ${newBookedDays.length} day(s) at ${listing.propertyName}`,
             });
 
-            console.log("Notification created successfully.".green);
+            await Message.create({
+                sender: listing.user._id,
+                receiver: req.user._id,
+                listing: listingId,
+                propertyUserId: req.user._id,
+                content: `New booking is successful for ${uniqueBookedDays.length} day(s) at ${listing.propertyName}`,
+            })
+
+            console.log("Notification and Message created successfully.".green);
 
             res.status(200).json({
                 success: true,
