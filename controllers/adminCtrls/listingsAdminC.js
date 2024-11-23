@@ -5,13 +5,15 @@ import Listing from "../../models/listingModel.js"
 import cloudinaryConfig from '../../uploadUtils/cloudinaryConfig.js';
 import { validateListingRequiredFields } from '../../utils/validateListings.js';
 import sendEmail from '../../utils/sendMail.js';
-import { sendListingApprovedEmail, sendListingRejectedEmail, sendSuccessfulBookingMailToAllSuperAdmin, sendSuccessfulPaymentMail } from '../../utils/authUtils.js';
+import { sendListingApprovedEmail, sendListingRejectedEmail, sendPropertyPriceUpdateToUsers, sendSuccessfulBookingMailToAllSuperAdmin, sendSuccessfulPaymentMail } from '../../utils/authUtils.js';
 import DraftListing from '../../models/draftListingModel.js';
 import User from '../../models/userModel.js';
 import { formatListingData, formatSaveForLaterListingData } from '../../utils/formatListingData.js';
 import Booking from '../../models/bookingModel.js';
 import Notification from "../../models/notificationModel.js";
 import Message from "../../models/messageModel.js"
+import { successfulPriceUpdateEmail } from '../../email_templates/successfulBookingMailToSpaceOwner.js';
+import mongoose from 'mongoose';
 
 const getCoordinates = async (address) => {
     try {
@@ -161,148 +163,143 @@ export const getListingById = asyncHandler(async (req, res) => {
 
 // Admin
 export const updateListingStatus = asyncHandler(async (req, res) => {
-    console.log("Updating listing status".yellow);
+  console.log("Updating listing status".yellow);
 
-    try {
-        const { listingId, newListingStatus } = req.query;
+  const session = await mongoose.startSession(); // Start a transaction session
+  session.startTransaction();
 
-        // Validate the new listing status
-        if (!newListingStatus || !["approved", "rejected", 'active', 'inactive', 'pending', 'draft', 'archived', 'blocked'].includes(newListingStatus)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid listing status'
-            });
-        }
+  try {
+      const { listingId, newListingStatus } = req.query;
 
-        const listing = await Listing.findById(listingId).populate('user');
+      // Validate the new listing status
+      if (!newListingStatus || !["approved", "rejected", 'active', 'inactive', 'pending', 'draft', 'archived', 'blocked'].includes(newListingStatus)) {
+          return res.status(400).json({
+              success: false,
+              message: 'Invalid listing status'
+          });
+      }
 
-        if (!listing) {
-            return res.status(404).json({
-                success: false,
-                message: 'Listing not found'
-            });
-        }
+      const listing = await Listing.findById(listingId).populate('user').session(session);
 
-        // Perform validation for required fields when approving the listing
-        if (newListingStatus === "approved") {
-            const validationErrors = validateListingRequiredFields(listing);
+      if (!listing) {
+          return res.status(404).json({
+              success: false,
+              message: 'Listing not found'
+          });
+      }
 
-            const to = listing.user.email;
-            const fullName = listing.user.firstName;
-            const listingName = listing.propertyName
-            const rejectionDate = new Date()
-            const approvalDate = new Date()
+      // Handle validation and updates for approved listings
+      if (newListingStatus === "approved") {
+          const validationErrors = validateListingRequiredFields(listing);
 
-            if (validationErrors.length > 0) {
-                const formattedErrors = validationErrors.join('<br>');
+          const to = listing.user.email;
+          const fullName = listing.user.firstName;
+          const listingName = listing.propertyName;
+          const rejectionDate = new Date();
+          const approvalDate = new Date();
 
-                // Send mail to notify the listing owner
-                const to = listing.user.email;
-                const fullName = listing.user.firstName;
-                const listingName = listing.propertyName
-                const rejectionReason = formattedErrors
-                
+          if (validationErrors.length > 0) {
+              const formattedErrors = validationErrors.join('<br>');
 
-                await sendListingRejectedEmail(to, fullName, listingName, rejectionDate, rejectionReason)
+              // Notify the user about the rejection via email
+              await sendListingRejectedEmail(to, fullName, listingName, rejectionDate, formattedErrors);
 
-                console.log("Listing cannot be approved. An email containing the missing details has already also been sent to the property owner".red)
-                return res.status(400).json({
-                    success: false,
-                    message: 'Listing cannot be approved. An email containing the missing details has already also been sent to the property owner. The following fields are missing or invalid:',
-                    data: validationErrors
-                });
-            }
+              console.log("Listing cannot be approved. Email sent to property owner.".red);
+              return res.status(400).json({
+                  success: false,
+                  message: 'Listing cannot be approved. Email sent to property owner. Missing or invalid fields:',
+                  data: validationErrors
+              });
+          }
 
-            if(listing.chargePerNight !== listing.oldChargePerNight){
-              console.log("Sending mail to all current bookings and updating old charge per night".green)
-
-              const listingOwner = await Listing.findById(listingId).populate("user")
+          if (listing.chargePerNight !== listing.oldChargePerNight) {
+              console.log("Handling price change notifications.".green);
 
               const bookingsInProgress = await Booking.find({
-                spaceOwnerId: listingOwner.user._id,
-                bookingStatus: "in-progress"
-              }).populate("listing").populate("user")
+                  spaceOwnerId: listing.user._id,
+                  bookingStatus: "in-progress"
+              }).populate("listing").populate("user").session(session);
 
-              if(bookingsInProgress.length > 1) {
-                  try {
-                    await Promise.all(
+              if (bookingsInProgress.length > 0) {
+                console.log(`Total of ${bookingsInProgress.length} current space users found, sending mail to all`.cyan)
+                  await Promise.all(
                       bookingsInProgress.map(async (bookingInProgress) => {
-                          await successfulPriceUpdateEmail(
-                              listingOwner.user.email,
+                        
+                          try {
+                            await sendPropertyPriceUpdateToUsers(
+                              bookingInProgress.user.email,
                               bookingInProgress.listing.propertyName,
                               bookingInProgress.listing.oldChargePerNight,
                               bookingInProgress.listing.chargePerNight
-                          );
+                            );
+                          } catch (error) {
+                            console.log("Error sending mail", error)
+                          }
 
                           // Create a notification for the user
-                          await Notification.create({
+                          await Notification.create([{
                             user: bookingInProgress.user._id,
                             listing: bookingInProgress.listing._id,
                             title: "Price Change Notification",
-                            subTitle: `The nightly charge for ${existingListing.propertyName} has changed from ₦${formatAmount(
-                                existingListing.chargePerNight
-                            )} to ₦${formatAmount(formattedData.chargePerNight)}. Kingly take note that this chnage will only become effective from next bookings and it will have no effect on all current active bookings`,
-                          });
+                            subTitle: `The nightly charge for ${listing.propertyName} has changed from ₦${listing.oldChargePerNight} to ₦${listing.chargePerNight}. This change will only apply to new bookings and will not affect current active bookings.`,
+                          }], { session });
 
-                          console.log("Price change notification created".rainbow)
-
-                          // Create in app chat notification also
-                          await Message.create({
-                            sender: listingOwner.user._id,
+                          // Create in-app chat notification
+                          await Message.create([{
+                            sender: listing.user._id,
                             receiver: bookingInProgress.user._id,
                             listing: bookingInProgress.listing._id,
-                            content: `The nightly charge for ${existingListing.propertyName} has changed from ₦${formatAmount(
-                                existingListing.chargePerNight
-                            )} to ₦${formatAmount(formattedData.chargePerNight)}. Kingly take note that this chnage will only become effective from next bookings and it will have no effect on all current active bookings`
-                          })
-                          console.log("Price change message created".magenta)
+                            content: `The nightly charge for ${listing.propertyName} has changed from ₦${listing.oldChargePerNight} to ₦${listing.chargePerNight}. This change will only apply to new bookings and will not affect current active bookings.`,
+                          }], { session });
                       })
-                    );
-                  } catch (error) {
-                    console.log("Error sending price update email to all space users", error)
-                  }
-              }else {
-                console.log("No booking in progress at the moment".blue)
+                  );
+              } else {
+                  console.log("No bookings in progress.".blue);
               }
-            }
 
-            // If no validation errors, update the status to approved and listed
-            console.log("Sending email to user for successful approval".blue)
-            await sendListingApprovedEmail(to, fullName, listingName, approvalDate)
+              // Update oldChargePerNight
+              listing.oldChargePerNight = listing.chargePerNight;
+          }
 
-            listing.listingStatus = newListingStatus;
-            listing.status = "listed";
+          // If no validation errors, approve the listing
+          await sendListingApprovedEmail(to, fullName, listingName, approvalDate);
+          listing.listingStatus = newListingStatus;
+          listing.status = "listed";
+      } else if (newListingStatus === "active") {
+          // Mark listing as active
+          listing.listingStatus = newListingStatus;
+          listing.status = "listed";
+      } else {
+          // For other statuses, unlist the listing
+          listing.listingStatus = newListingStatus;
+          listing.status = "unlisted";
+      }
 
-            const listingOldPrice = listing.chargePerNight
-            const listingNewPrice = listing.
-            if()
-        } else if (newListingStatus === "active") {
-            // If marking as active, update the status
-            listing.listingStatus = newListingStatus;
-            listing.status = "listed";
-        } else {
-            // For other statuses, mark the listing as unlisted
-            listing.listingStatus = newListingStatus;
-            listing.status = "unlisted";
-        }
+      // Save the updated listing
+      await listing.save({ session });
 
-        // Save the updated listing
-        await listing.save();
+      // Commit the transaction
+      await session.commitTransaction();
+      session.endSession();
 
-        console.log("Listing status successful updated".magenta)
-        res.status(200).json({
-            success: true,
-            message: 'Listing status updated successfully',
-            data: listing
-        });
-    } catch (error) {
-        console.error(`Error updating listing status: ${error.message}`.red);
-        return res.status(500).json({
-            success: false,
-            message: `Server error: ${error.message}`,
-            error
-        });
-    }
+      console.log("Listing status successfully updated".magenta);
+      res.status(200).json({
+          success: true,
+          message: 'Listing status updated successfully',
+          data: listing
+      });
+  } catch (error) {
+      // Rollback the transaction in case of an error
+      await session.abortTransaction();
+      session.endSession();
+
+      console.error(`Error updating listing status: ${error.message}`.red);
+      res.status(500).json({
+          success: false,
+          message: `Server error: ${error.message}`,
+          error
+      });
+  }
 });
 
 

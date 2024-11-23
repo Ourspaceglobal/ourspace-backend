@@ -273,6 +273,11 @@ export const sendSuccessfulBookingMailToAllSuperAdmin = async (spaceUserName, ap
 }
 
 export const sendPropertyPriceUpdateToUsers = async (spaceUserEmail, apartmentName, oldChargePerNight, newChargePerNight)=> {
+
+  if (oldChargePerNight == null || newChargePerNight == null) {
+    throw new Error("Invalid charge per night values");
+  }
+
   try {
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -285,19 +290,20 @@ export const sendPropertyPriceUpdateToUsers = async (spaceUserEmail, apartmentNa
       },
     });
 
-    const htmlContent = await successfulPriceUpdateEmail(spaceUserEmail, apartmentName, oldChargePerNight, newChargePerNight);
+    const htmlContent = await successfulPriceUpdateEmail(apartmentName, oldChargePerNight, newChargePerNight);
 
     const mailOptions = {
       from: {
         name: `OS - Booking Price Update`,
-        address: process.env.EMAIL_USER,
+        address: process.env.EMAIL_USER,git add .
       },
       to: spaceUserEmail,
-      subject: `Change In Booking Price: ${newChargePerNight}`,
+      subject: `Change In Booking Price: #${formatAmount(newChargePerNight)}`,
       html: htmlContent
     };
 
     await transporter.sendMail(mailOptions);
+    console.log(`Email sent successfully to ${spaceUserEmail}`);
   } catch (error) {
     console.error('Error sending booking price update to space user:', error);
     throw new Error('Error sending booking price update to space user');

@@ -1,3 +1,5 @@
+import { formatAmount } from "../utils/helperFunction.js";
+
 export const successfulBookingMailToSpaceOwner = async (spaceUserName, apartmentName, totalNight, daysBooked, totalPaid) => {
     return `
       <!DOCTYPE html>
@@ -275,8 +277,8 @@ export const successfulBookingMailToSpaceOwner = async (spaceUserName, apartment
                   <p><strong>Updated Property Details:</strong></p>
                   <ul>
                       <li><strong>Property name:</strong> ${apartmentName}</li>
-                      <li><strong>Old booking Price:</strong> ${oldChargePerNight}</li>
-                      <li><strong>New Booking Price:</strong> #${newChargePerNight}</li>
+                      <li><strong>Old booking Price:</strong> #${formatAmount(oldChargePerNight)}</li>
+                      <li><strong>New Booking Price:</strong> #${formatAmount(newChargePerNight)}</li>
                   </ul>
                   
                   <a href="mailto:ourspacegloballtd@gmail.com" class="cta-button">Contact Support</a>
