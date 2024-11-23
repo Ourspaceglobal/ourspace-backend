@@ -11,6 +11,8 @@ import http from "http";
 import { Server } from "socket.io";
 
 // Import routes
+import temporaryRoutes from "./routes/extras/temporaryRoute.js"
+
 import passport from "./utils/passport.js";
 import db from './config/db.js';
 import waitlistRoutes from "./routes/extras/waitlistRoutes.js";
@@ -109,6 +111,7 @@ app.use("/api/v1/messages", messageRoutes);
 app.use("/api/v1/paystack", paystackRoutes);
 app.use("/api/v1/wallet", walletRoutes)
 app.use("/api/v1/calendar", calendarRoutes)
+app.use("/api/v1/temporary", temporaryRoutes)
 
 // Admin routes
 app.use("/api/v1/admin/dashboard", adminDashboardR);

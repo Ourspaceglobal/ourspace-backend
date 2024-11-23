@@ -22,7 +22,7 @@ router
 
 router
   .route('/admin-create-listing')
-  .post(protect, upload.fields([
+  .post(protect,admin, upload.fields([
     { name: 'bedroomPictures', maxCount: 10 },
     { name: 'livingRoomPictures', maxCount: 10 },
     { name: 'bathroomToiletPictures', maxCount: 10 },

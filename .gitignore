@@ -4,3 +4,6 @@ node_modules
 .envDev
 .envProd
 invoices
+
+routes/extras/temporaryRoute.js
+controllers/extras/temporaryCtrlr.js
