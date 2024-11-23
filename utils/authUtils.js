@@ -295,7 +295,7 @@ export const sendPropertyPriceUpdateToUsers = async (spaceUserEmail, apartmentNa
     const mailOptions = {
       from: {
         name: `OS - Booking Price Update`,
-        address: process.env.EMAIL_USER,git add .
+        address: process.env.EMAIL_USER,
       },
       to: spaceUserEmail,
       subject: `Change In Booking Price: #${formatAmount(newChargePerNight)}`,
