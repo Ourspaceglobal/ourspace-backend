@@ -10,6 +10,8 @@ import DraftListing from '../../models/draftListingModel.js';
 import User from '../../models/userModel.js';
 import { formatListingData, formatSaveForLaterListingData } from '../../utils/formatListingData.js';
 import Booking from '../../models/bookingModel.js';
+import Notification from "../../models/notificationModel.js";
+import Message from "../../models/messageModel.js"
 
 const getCoordinates = async (address) => {
     try {
@@ -219,7 +221,7 @@ export const updateListingStatus = asyncHandler(async (req, res) => {
               const bookingsInProgress = await Booking.find({
                 spaceOwnerId: listingOwner.user._id,
                 bookingStatus: "in-progress"
-              })
+              }).populate("listing").populate("user")
 
               if(bookingsInProgress.length > 1) {
                   try {
@@ -231,6 +233,29 @@ export const updateListingStatus = asyncHandler(async (req, res) => {
                               bookingInProgress.listing.oldChargePerNight,
                               bookingInProgress.listing.chargePerNight
                           );
+
+                          // Create a notification for the user
+                          await Notification.create({
+                            user: bookingInProgress.user._id,
+                            listing: bookingInProgress.listing._id,
+                            title: "Price Change Notification",
+                            subTitle: `The nightly charge for ${existingListing.propertyName} has changed from ₦${formatAmount(
+                                existingListing.chargePerNight
+                            )} to ₦${formatAmount(formattedData.chargePerNight)}. Kingly take note that this chnage will only become effective from next bookings and it will have no effect on all current active bookings`,
+                          });
+
+                          console.log("Price change notification created".rainbow)
+
+                          // Create in app chat notification also
+                          await Message.create({
+                            sender: listingOwner.user._id,
+                            receiver: bookingInProgress.user._id,
+                            listing: bookingInProgress.listing._id,
+                            content: `The nightly charge for ${existingListing.propertyName} has changed from ₦${formatAmount(
+                                existingListing.chargePerNight
+                            )} to ₦${formatAmount(formattedData.chargePerNight)}. Kingly take note that this chnage will only become effective from next bookings and it will have no effect on all current active bookings`
+                          })
+                          console.log("Price change message created".magenta)
                       })
                     );
                   } catch (error) {
