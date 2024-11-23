@@ -867,6 +867,8 @@ const editListing = asyncHandler(async (req, res) => {
   const listingId = req.params.id;
   const existingListing = await Listing.findById(listingId);
 
+  const oldChargePerNight = existingListing.chargePerNight
+
   if (!existingListing) { 
       console.log("Listing not found".red);
       return res.status(404).json({
@@ -973,6 +975,7 @@ const editListing = asyncHandler(async (req, res) => {
           {
               ...formattedData,
               chargePerNightWithout10Percent,
+              oldChargePerNight,
               propertyLocation: {
                 ...formattedData.propertyLocation,
                 latitude,
