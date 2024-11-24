@@ -246,6 +246,16 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
             });
         }
 
+        if (existingWithdrawal.status === "completed") {
+            console.log("Withdrawal has already been verified".red);
+            await session.abortTransaction(); 
+            session.endSession();
+            return res.status(400).json({
+                success: false,
+                message: "Withdrawal already verified",
+            });
+        }
+
         // Variables needed for Paystack API request
         const paystackKey = process.env.NODE_ENV === "development" 
             ? process.env.PAYSTACK_TEST_SECRET_KEY
@@ -286,12 +296,25 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
             console.log("Paystack Response: ", response.data);
 
             if (status) {
-                console.log(`Paystack OTP Verification Success: ${data.status}`);
-                console.log("Transfer Code:", data.transfer_code);
-                console.log("Amount Transferred:", data.amount);
-                console.log("Recipient:", data.recipient);
+                
+                existingWithdrawal.paystack_status = "success",
+                existingWithdrawal.status = "completed"
+                
+                await existingWithdrawal.save({ session });
+                
+                console.log(`Paystack OTP Verification Successful`.rainbow);
+                
             } else {
-                console.log(`Paystack OTP Verification Failed: ${message}`.rainbow);
+                console.log(`Paystack OTP Verification Failed: ${message}`.red);
+
+                return res.status(500).json({
+                    success: false,
+                    message: `Withdrawal approval failed: ${message}`,
+                    data: {
+                        transfer_code: data.transfer_code,
+                        status: data.status,
+                    },
+                });
             }
         
             // Return the formatted response if needed
