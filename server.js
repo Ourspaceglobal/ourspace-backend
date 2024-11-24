@@ -27,6 +27,7 @@ import paystackRoutes from "./routes/extras/paystackRoutes.js";
 import socketHandlers from "./config/socketConfig.js"
 import walletRoutes from "./routes/walletRoutes.js"
 import calendarRoutes from "./routes/calendarRoutes.js"
+import payoutRoutes from "./routes/adminRoutes/payoutRoute.js"
 
 // Admin routes
 import adminDashboardR from "./routes/adminRoutes/adminDashboardR.js";
@@ -101,6 +102,7 @@ const io = new Server(server, {
 socketHandlers(io);
 
 // Routes
+app.use("/api/v1/temporary", temporaryRoutes)
 app.use("/api/v1/waitlist", waitlistRoutes);
 app.use("/api/v1/users", authRoutes);
 app.use("/api/v1/listing", listingsRoute);
@@ -111,7 +113,7 @@ app.use("/api/v1/messages", messageRoutes);
 app.use("/api/v1/paystack", paystackRoutes);
 app.use("/api/v1/wallet", walletRoutes)
 app.use("/api/v1/calendar", calendarRoutes)
-app.use("/api/v1/temporary", temporaryRoutes)
+app.use("/api/v1/payouts", payoutRoutes)
 
 // Admin routes
 app.use("/api/v1/admin/dashboard", adminDashboardR);

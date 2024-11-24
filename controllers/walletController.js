@@ -84,15 +84,25 @@ export const spaceOwnerGetWallet = asyncHandler(async (req, res) => {
             user: req.user._id,
         }).populate("user").sort({ createdAt: -1 });
 
+        function maskNumber(number) {
+            if (!number || typeof number !== "string") {
+                return "******"; // Return a placeholder if the number is invalid
+            }
+            const maskedPart = "*".repeat(number.length - 4); // Generate asterisks for all but the last 4 digits
+            const visiblePart = number.slice(-4); // Get the last 4 digits
+            return maskedPart + visiblePart; // Combine masked and visible parts
+        }
+        
         const formattedWithdrawals = withdrawals.map((withdrawal) => ({
             id: withdrawal._id,
-            payoutId: withdrawal.paystack_id,
+            payoutId: withdrawal.transactionId,
             invoiceId: withdrawal.paystack_id,
             date: formatDate(withdrawal.createdAt),
-            amountWithdrawn: withdrawal.amount,
-            withdrawnTo: "still wait",
+            amountWithdrawn: withdrawal.withdrawalAmount,
+            withdrawnTo: maskNumber(withdrawal.accountNumberWithdrawnTo) || null, 
             status: withdrawal.status,
         }));
+        
 
         return res.status(200).json({
             success: true,
@@ -529,111 +539,138 @@ export const spaceOwnerSaveNewAccountDetails = asyncHandler(async (req, res) => 
     }
 });
 
-export const initiateWithdrawal = async (req, res) => {
+export const spaceOwnerInitiateWithdrawal = async (req, res) => {
 
-    console.log("Inititating withdrawal".blue)
+    console.log("Space owner Initiating withdrawal".blue);
     const { withdrawal_amount, recipient_code } = req.body;
 
-    if(!withdrawal_amount ||!recipient_code) {
-        console.log("Withdrawal amount and recipient codes are required".red)
-        return res.status(500).json({
+    if (!withdrawal_amount || !recipient_code) {
+        console.log("Withdrawal amount and recipient codes are required".red);
+        return res.status(400).json({
             success: false,
             message: "Withdrawal amount and recipient codes are required"
-        })
+        });
     }
 
-    // const withdrawal_amount = Number(withdrawal_amount);
+    const wallet = await Wallet.findOne({ user: req.user._id });
 
-    const wallet= await Wallet.findOne({user: req.user._id})
-
-    if(!wallet || wallet.currentBalance < withdrawal_amount){
-        console.log(`Wallet balance: ${formatAmount(wallet.currentBalance)} less than withdrawal request amount of ${formatAmount(withdrawal_amount)}`.red)
-        return res.status(200).json({
-            success: true,
-            message: `Wallet balance: ${formatAmount(wallet.currentBalance)} less than withdrawal request amount of ${formatAmount(withdrawal_amount)}`
-        })
+    if (!wallet) {
+        console.log("Wallet not found".red);
+        return res.status(404).json({
+            success: false,
+            message: "Wallet not found"
+        });
     }
 
-    const reason = "Withdrawal from wallet"
+    if (wallet.currentBalance < withdrawal_amount) {
+        console.log(`Insufficient wallet balance. Current balance is ${formatAmount(wallet.currentBalance)}`.red);
+        return res.status(400).json({
+            success: false,
+            message: `Insufficient wallet balance. Current balance is ${formatAmount(wallet.currentBalance)}`
+        });
+    }
+
+    const bankDetails = await BankDetails.findOne({ "banks.recipientCode": recipient_code });
+
+    if (!bankDetails) {
+        console.log("The bank being withdrawn to cannot be found".red);
+        return res.status(404).json({
+            success: false,
+            message: "The bank being withdrawn to cannot be found"
+        });
+    }
+
+    const matchingBank = bankDetails.banks.find(bank => bank.recipientCode === recipient_code);
+
+    if (!matchingBank) {
+        console.log("The bank being withdrawn to cannot be found".red);
+        return res.status(404).json({
+            success: false,
+            message: "The bank being withdrawn to cannot be found"
+        });
+    }
 
     try {
-        const response = await axios.post(
-            `https://api.paystack.co/transfer`, 
-            {
-                source: "balance",  // Paystack balance
-                amount: withdrawal_amount * 100,  // Amount in kobo (multiply NGN by 100)
-                recipient: recipient_code,  
-                reason: reason  
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${process.env.PAYSTACK_TEST_SECRET_KEY}`,
-                },
-            }
-        );
+        // Create a new withdrawal record
+        const newWithdrawal = new Withdrawal({
+            user: req.user._id,
+            methodOfWithdrawal: "paystack",
+            withdrawalAmount: withdrawal_amount,
+            status: "pending",
+            accountNumberWithdrawnTo: matchingBank.accountNumber,
+            bankNameWithdrawnTo: matchingBank.bankName,
+            recipient_code: recipient_code,
+            reason: "Withdrawal from wallet"
+        });
 
-        const { status, data } = response.data;
+        await newWithdrawal.save();
 
-        console.log("data from withdrawal request: ", data)
+        // Update wallet balance
+        wallet.totalWithdrawn = Number(wallet.totalWithdrawn || 0);
+        const withdrawalAmountInNaira = Number(withdrawal_amount);
 
-        if (status) {
-            console.log(`Withdrawal request for amount ${withdrawal_amount} successfully submitted`)
+        wallet.currentBalance -= withdrawalAmountInNaira;
+        wallet.totalWithdrawn += withdrawalAmountInNaira;
+        await wallet.save();
 
-            // Save new wihtdrawal request to database
-            const newWithdrawal = new Withdrawal({
-                user: req.user._id, 
-                paystack_id: data.id,
-                amount: data.amount / 100,
-                recipient_code: recipient_code,
-                transfer_code: data.transfer_code, 
-                reference: data.reference,
-                source: data.source,
-                status: "pending",
-                paystack_status: data.status, 
-                transfer_success_id: data.transferSuccessId,
-                transfer_trials: data.transfer_trials,
-                reason: reason,
-                failures: data.failures || null,
-                paystack_createdAt: data.createdAt,
-                paystack_updatedAt: data.updatedAt
-            });
+        // Use `_id` to find the specific withdrawal created
+        const latestWithdrawal = await Withdrawal.findById(newWithdrawal._id).populate('user');
 
-            await newWithdrawal.save();
-
-            wallet.totalWithdrawn = Number(wallet.totalWithdrawn);
-            const withdrawalAmountInNaira = Number(withdrawal_amount)
-
-            wallet.currentBalance -= withdrawalAmountInNaira;
-            wallet.totalWithdrawn += withdrawalAmountInNaira;
-            await wallet.save();
-
-            const formattedResponse = {
-                amount: data.amount,
-                status: "pending",
-
-            }
-
-            return res.status(200).json({
-                success: true,
-                message: `You have successfully requested for withdrawal for a total amount of ${withdrawal_amount} which is currently pending and you're expected to receive the funds within 25 minutes after the request`,
-                transfer_details: formattedResponse  // Return transfer details
-            });
-        } else {
-            console.log("Failed to initiate withdrawal")
-            return res.status(400).json({
+        if (!latestWithdrawal) {
+            console.log("Can't find latest withdrawal".red);
+            return res.status(500).json({
                 success: false,
-                message: "Failed to initiate withdrawal",
+                message: "Can't find latest withdrawal"
             });
         }
 
+        function maskNumber(number) {
+            if (!number || typeof number !== "string") {
+                return "******"; // Return a placeholder if the number is invalid
+            }
+            const maskedPart = "*".repeat(number.length - 4); // Generate asterisks for all but the last 4 digits
+            const visiblePart = number.slice(-4); // Get the last 4 digits
+            return maskedPart + visiblePart; // Combine masked and visible parts
+        }
+
+        // Format the response
+        const formattedWithdrawal = {
+            user: req.user._id,
+            transactionId: latestWithdrawal.transactionId,
+            methodOfWithdrawal: latestWithdrawal.methodOfWithdrawal,
+            accountNumberWithdrawnTo: maskNumber(latestWithdrawal.accountNumberWithdrawnTo),
+            userEmail: latestWithdrawal.user.email,
+            withdrawalAmount: latestWithdrawal.withdrawalAmount,
+            status: latestWithdrawal.status,
+            bankNameWithdrawnTo: latestWithdrawal.bankNameWithdrawnTo,
+            recipient_code: latestWithdrawal.recipient_code,
+            reason: latestWithdrawal.reason
+        };
+
+        console.log("Withdrawal successful".rainbow);
+        return res.status(200).json({
+            success: true,
+            message: `You have successfully requested for withdrawal for a total amount of #${formatAmount(withdrawal_amount)} which is currently pending and you're expected to receive the funds within 24 hours`,
+            withdrawal: formattedWithdrawal
+        });
     } catch (error) {
-        console.error("Error initiating withdrawal", error);
-        return res.status(500).json({
+        console.error("Error during withdrawal process:", error);
+        res.status(500).json({
             success: false,
-            message: "An error occurred while initiating the withdrawal"
+            message: error.message || "An error occurred during the withdrawal process"
         });
     }
 };
+
+
+// 
+let paystackKey;
+if(process.env.NODE_ENV === "development"){
+    paystackKey = process.env.PAYSTACK_TEST_SECRET_KEY
+} else {
+    paystackKey = process.env.PAYSTACK_LIVE_SECRET_KEY
+}
+
                                                  //  SPACE USERS WALLET TAB
 export const spaceUserGetWallet = asyncHandler(async(req, res) => {
     console.log("Space user get wallet endpoint".blue)

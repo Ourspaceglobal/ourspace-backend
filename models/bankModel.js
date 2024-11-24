@@ -20,3 +20,4 @@ const bankDetailsSchema = new mongoose.Schema({
 const BankDetails = mongoose.model('BankDetails', bankDetailsSchema);
 
 export default BankDetails;
+ 
