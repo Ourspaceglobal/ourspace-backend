@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import asyncHandler from "../middleware/asyncHandler.js";
 import Listing from "../models/listingModel.js";
 import Review from "../models/reviewsModel.js";
@@ -13,47 +14,45 @@ const uploadReviewImagesToCloudinary = async (files) => {
 
     const uploadedImages = await Promise.all(uploadPromises);
 
-    // Extract only the URLs (or secure URLs) from the response
-    return uploadedImages.map(image => image.secure_url);
+    // Extract secure_url and public_id from the Cloudinary response
+    return uploadedImages.map(image => ({
+        secure_url: image.secure_url,
+        public_id: image.public_id
+    }));
 };
 
 
 const addNewReview = asyncHandler(async (req, res) => {
     console.log("Adding a new review".yellow);
 
-    const { listingId, userId } = req.query;
-
+    const { listingId, userId } = req.query; 
     const {
-        starValue,
-        title,
-        experience,
-        stayPeriod,
-        cleanliness,
-        accuracy,
-        value,
-        service,
-        facilities,
-        location,
-        reviewCertification
+        starValue, title, userExperience, stayPeriod,
+        cleanliness, accuracy, value, service,
+        facilities, location, reviewCertification
     } = req.body;
 
+    let session;
+    let uploadedPublicIds = []; // To track uploaded public IDs for cleanup on error
+
     try {
-        console.log("Creating a new review".blue);
+        session = await mongoose.startSession();
+        session.startTransaction();
 
         let reviewImages = [];
-
-        // Check if files are uploaded
         if (req.files && req.files.length > 0) {
-            console.log("Uploading review images".grey)
-            reviewImages = await uploadReviewImagesToCloudinary(req.files);  // Pass the entire array
+            console.log("Uploading review images".grey);
+            const uploadedImages = await uploadReviewImagesToCloudinary(req.files);
+            reviewImages = uploadedImages;
+            uploadedPublicIds = uploadedImages.map(img => img.public_id); // Track public IDs
         }
 
-        const review = await Review.create({
+        const review = await Review.create([{
             listing: listingId,
             user: userId,
             starValue: parseFloat(starValue.trim()),
             title: title.trim(),
-            experience: experience.trim(),
+            userExperience: userExperience.trim(),
             stayPeriod: stayPeriod.trim(),
             cleanliness: parseFloat(cleanliness.trim()),
             accuracy: parseFloat(accuracy.trim()),
@@ -63,9 +62,9 @@ const addNewReview = asyncHandler(async (req, res) => {
             location: parseFloat(location.trim()),
             reviewImages,
             reviewCertification: reviewCertification.trim()
-        });
+        }], { session });
 
-        let reviewStats = await ReviewStats.findOne({ listing: listingId });
+        let reviewStats = await ReviewStats.findOne({ listing: listingId }).session(session);
 
         if (!reviewStats) {
             reviewStats = new ReviewStats({
@@ -81,7 +80,6 @@ const addNewReview = asyncHandler(async (req, res) => {
             });
         }
 
-        console.log("Review successfully created, updating review statistics".green);
         reviewStats.totalReviews += 1;
         reviewStats.totalStarRating = ((reviewStats.totalStarRating * (reviewStats.totalReviews - 1)) + parseFloat(starValue.trim())) / reviewStats.totalReviews;
         reviewStats.totalCleanliness = ((reviewStats.totalCleanliness * (reviewStats.totalReviews - 1)) + parseFloat(cleanliness.trim())) / reviewStats.totalReviews;
@@ -91,7 +89,9 @@ const addNewReview = asyncHandler(async (req, res) => {
         reviewStats.totalFacilities = ((reviewStats.totalFacilities * (reviewStats.totalReviews - 1)) + parseFloat(facilities.trim())) / reviewStats.totalReviews;
         reviewStats.totalLocation = ((reviewStats.totalLocation * (reviewStats.totalReviews - 1)) + parseFloat(location.trim())) / reviewStats.totalReviews;
 
-        await reviewStats.save();
+        await reviewStats.save({ session });
+        await session.commitTransaction();
+        session.endSession();
 
         console.log("Review and review statistics updated successfully".magenta);
         res.status(201).json({
@@ -100,6 +100,18 @@ const addNewReview = asyncHandler(async (req, res) => {
             data: review
         });
     } catch (error) {
+        if (session) await session.abortTransaction();
+        console.log("Transaction aborted. Cleaning up uploaded images.".red);
+
+        // Cleanup Cloudinary images
+        if (uploadedPublicIds.length > 0) {
+            const deletePromises = uploadedPublicIds.map(publicId =>
+                cloudinaryConfig.uploader.destroy(publicId)
+            );
+            await Promise.all(deletePromises); // Wait for all deletions to complete
+            console.log("Uploaded images deleted from Cloudinary.".green);
+        }
+
         console.log("Error", error.message);
         res.status(400).json({
             success: false,
@@ -108,8 +120,6 @@ const addNewReview = asyncHandler(async (req, res) => {
         });
     }
 });
-
-
 
 export { 
     addNewReview

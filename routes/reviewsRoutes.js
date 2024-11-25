@@ -9,6 +9,10 @@ router
   .route("/create-review")
   .post(protect, upload.array('reviewImages', 10), addNewReview);
 
+router
+  .route("/get-reviews-for-listing")
+  .get();
+
 export default router;
 
 

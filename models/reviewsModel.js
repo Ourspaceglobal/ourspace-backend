@@ -4,13 +4,11 @@ import mongoose from "mongoose";
 const reviewSchema = new mongoose.Schema({
     user: {
         type: mongoose.Schema.Types.ObjectId, 
-        ref: 'User',
-        required: true
+        ref: 'User'
     },
     listing: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Listing',
-        required: true
+        ref: 'Listing'
     },
     starValue: {
         type: Number,
@@ -19,12 +17,10 @@ const reviewSchema = new mongoose.Schema({
         required: [true, "Only values between 1 - 5 is allowed"]
     },
     title: {
-        type: String,
-        required: true
+        type: String
     },
-    experience: {
+    userExperience: {
         type: String,
-        required: true
     },
     stayPeriod: {
         type: String,  // YYYY-MM-DD format
@@ -38,41 +34,56 @@ const reviewSchema = new mongoose.Schema({
         type: Number,
         min: 1,
         max: 10,
+        default: 10,
         required: [true, "Only numbers between 1 - 10 is allowed"]
     },
     accuracy: {
         type: Number,
         min: 1,
         max: 10,
+        default: 10,
         required: [true, "Only numbers between 1 - 10 is allowed"]
     },
     value: {
         type: Number,
         min: 1,
         max: 10,
+        default: 10,
         required: [true, "Only numbers between 1 - 10 is allowed"]
     },
     service: {
         type: Number,
         min: 1,
         max: 10,
+        default: 10,
         required: [true, "Only numbers between 1 - 10 is allowed"]
     },
     facilities: {
         type: Number,
         min: 1,
         max: 10,
+        default: 10,
         required: [true, "Only numbers between 1 - 10 is allowed"]
     },
     location: {
         type: Number,
         min: 1,
         max: 10,
+        default: 10,
         required: [true, "Only numbers between 1 - 10 is allowed"]
     },
-    reviewImages: {
-        type: [String],
-    },
+    reviewImages: [
+        {
+            secure_url: {
+                type: String,
+                required: true
+            },
+            public_id: {
+                type: String,
+                required: true
+            }
+        }
+    ],
     reviewCertification: {
         type: Boolean,
         default: true,
