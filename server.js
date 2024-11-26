@@ -11,7 +11,7 @@ import http from "http";
 import { Server } from "socket.io";
 
 // Import routes
-import temporaryRoutes from "./routes/extras/temporaryRoute.js"
+// import temporaryRoutes from "./routes/extras/temporaryRoute.js"
 
 import passport from "./utils/passport.js";
 import db from './config/db.js';
@@ -102,7 +102,7 @@ const io = new Server(server, {
 socketHandlers(io);
 
 // Routes
-app.use("/api/v1/temporary", temporaryRoutes)
+// app.use("/api/v1/temporary", temporaryRoutes)
 app.use("/api/v1/waitlist", waitlistRoutes);
 app.use("/api/v1/users", authRoutes);
 app.use("/api/v1/listing", listingsRoute);
