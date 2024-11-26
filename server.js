@@ -114,6 +114,7 @@ app.use("/api/v1/paystack", paystackRoutes);
 app.use("/api/v1/wallet", walletRoutes)
 app.use("/api/v1/calendar", calendarRoutes)
 app.use("/api/v1/payouts", payoutRoutes)
+app.use("/api/v1/reviews", reviewsRoute)
 
 // Admin routes
 app.use("/api/v1/admin/dashboard", adminDashboardR);

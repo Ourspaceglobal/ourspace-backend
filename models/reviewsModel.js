@@ -85,10 +85,26 @@ const reviewSchema = new mongoose.Schema({
         }
     ],
     reviewCertification: {
-        type: Boolean,
+        type: Boolean, 
         default: true,
         required: true
     },
+    totalReviewLikes: {
+        type: Number,
+        default: 0,
+    },
+    totalReviewDislikes: {
+        type: Number,
+        default: 0
+    },
+    usersWhoLiked: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
+    usersWhoDisliked: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
     timestamp: {
         type: Date,
         default: Date.now

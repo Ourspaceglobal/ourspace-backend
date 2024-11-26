@@ -5,6 +5,9 @@ import cloudinaryConfig from "../uploadUtils/cloudinaryConfig.js";
 import { formatSaveForLaterListingData, formatListingData } from "../utils/formatListingData.js"
 import Booking from '../models/bookingModel.js';
 import DraftListing from '../models/draftListingModel.js';
+import ReviewStats from '../models/reviewTotalModel.js';
+import Review from '../models/reviewsModel.js';
+import { formatDateWithoutTime } from '../utils/helperFunction.js';
 
 const getCoordinates = async (address) => {
   try {
@@ -500,6 +503,46 @@ const getSingleListing = asyncHandler(async (req, res) => {
       }
 
       listing.user = undefined;
+
+      const reviews = await Review.find({listing: id}).populate("user").sort({createdAt: -1})
+      const reviewStats = await ReviewStats.findOne({listing: id})
+
+      if(!reviewStats) {
+        console.log("No review  stat found at the moment, created a new one for user".cyan)
+        reviewStats = new ReviewStats({
+          listing: id,
+          totalReviews: 0,
+          totalStarRating: 0,
+          totalCleanliness: 0,
+          totalAccuracy: 0,
+          totalValue: 0,
+          totalService: 0,
+          totalFacilities: 0,
+          totalLocation: 0
+        });
+      }
+
+      const formattedReviewStat = {
+        totalReviews: reviews.length,
+        totalStar: reviewStats.totalStarRating || 0,
+        cleanliness: reviewStats.totalCleanliness || 0,
+        value: reviewStats.totalValue || 0,
+        accuracy: reviewStats.accuracy || 0,
+        service: reviewStats.totalService || 0,
+        facilities: reviewStats.totalFacilities || 0,
+        location: reviewStats.totalLocation || 0
+      }
+
+      const formattedReviews = reviews.map((review) => ({
+        id: review.user._id,
+        star: review.starValue,
+        title: review.title,
+        subtitle: review.subTitle,
+        experience: review.userExperience,
+        totalReviewLikes: review.totalReviewLikes,
+        totalReviewDislikes: review.totalReviewDislikes,
+        createdAt: formatDateWithoutTime(review.createdAt)
+      }))
       
       console.log("Listing found".green);
       
@@ -508,7 +551,9 @@ const getSingleListing = asyncHandler(async (req, res) => {
           message: "Listing retrieved successfully",
           data: {
             user: formattedUser,
-            listing: listing
+            listing: listing,
+            reviewStat: formattedReviewStat,
+            reviews: formattedReviews
           },
       });
   } catch (error) {

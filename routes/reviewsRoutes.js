@@ -1,19 +1,16 @@
 import express from 'express';
-import { addNewReview } from '../controllers/reviewsCtrlr.js';
+import { addNewReview, likeOrDislikeReview } from '../controllers/reviewsCtrlr.js';
 import upload from '../uploadUtils/multer.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, spaceUser } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 router
-  .route("/create-review")
-  .post(protect, upload.array('reviewImages', 10), addNewReview);
+  .route("/su-add-new-review/:listingId")
+  .post(protect, spaceUser, upload.array('reviewImages', 10), addNewReview);
 
 router
-  .route("/get-reviews-for-listing")
-  .get();
+  .route("/like-or-dislike-review/:listingId")
+  .post(protect, likeOrDislikeReview);
 
 export default router;
-
-
- 
