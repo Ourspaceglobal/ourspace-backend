@@ -505,7 +505,7 @@ const getSingleListing = asyncHandler(async (req, res) => {
       listing.user = undefined;
 
       const reviews = await Review.find({listing: id}).populate("user").sort({createdAt: -1})
-      const reviewStats = await ReviewStats.findOne({listing: id})
+      let reviewStats = await ReviewStats.findOne({listing: id})
 
       if(!reviewStats) {
         console.log("No review  stat found at the moment, created a new one for user".cyan)
