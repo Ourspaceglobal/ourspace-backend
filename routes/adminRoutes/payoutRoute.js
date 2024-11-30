@@ -1,5 +1,5 @@
 import express from "express";
-import { adminRequestWithdrawalOtpFromPaystack, approveWithdrawal, getAllPayouts, getPayoutById, rejectWithdrawal } from "../../controllers/adminCtrls/payoutCtrlr.js";
+import { adminRequestWithdrawalOtpFromPaystack, approveWithdrawal, getAllPayouts, getPayoutById, paystackWebhook, rejectWithdrawal } from "../../controllers/adminCtrls/payoutCtrlr.js";
 import { admin, protect } from "../../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -26,7 +26,7 @@ route('/approve-withdrawal')
 //
 router.
 route('/withdrawal-webhook')
-.post(approveWithdrawal);
+.post(paystackWebhook);
 
 //
 router.
