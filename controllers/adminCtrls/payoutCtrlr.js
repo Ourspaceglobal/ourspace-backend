@@ -147,7 +147,7 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
         const response = await axios.post(
             `https://api.paystack.co/transfer`,
             {
-                source: "balance",  // Paystack balance
+                source: "balance",
                 amount: existingWithdrawal.withdrawalAmount * 100,  // Convert to kobo (cents)
                 recipient: existingWithdrawal.recipient_code,
                 reference: transferReference,
@@ -159,6 +159,11 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
                 },
             }
         );
+
+        const recipientResponse = await axios.get(`https://api.paystack.co/transferrecipient/${recipient_code}`, {
+            headers: { Authorization: `Bearer ${paystackKey}` },
+        });
+        console.log('Recipient Validation Response:', recipientResponse.data);
 
         const { status, data } = response.data;
 

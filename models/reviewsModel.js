@@ -80,7 +80,7 @@ const reviewSchema = new mongoose.Schema({
             },
             public_id: {
                 type: String,
-                required: true
+                required: true 
             }
         }
     ],
