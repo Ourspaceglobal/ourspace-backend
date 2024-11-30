@@ -303,8 +303,6 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
         
             const { status, data, message } = response.data;
 
-            console.log("Transfer State: ", response.data);
-
             if (status) {
                 // Update the withdrawal object
                 existingWithdrawal.paystack_status = "success";
