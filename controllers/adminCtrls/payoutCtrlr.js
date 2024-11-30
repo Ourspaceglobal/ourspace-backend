@@ -379,7 +379,7 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
 
 // Paystack Webhook Endpoint
 export const paystackWebhook = asyncHandler(async (req, res) => {
-    const secret = process.env.PAYSTACK_WEBHOOK_SECRET; 
+    const secret = paystackKey; 
     const signature = req.headers['x-paystack-signature'];
 
     // Validate the request signature
