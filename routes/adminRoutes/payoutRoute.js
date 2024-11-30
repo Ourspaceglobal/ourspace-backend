@@ -1,5 +1,5 @@
 import express from "express";
-import { adminRequestWithdrawalOtpFromPaystack, approveWithdrawal, getAllPayouts, getPayoutById } from "../../controllers/adminCtrls/payoutCtrlr.js";
+import { adminRequestWithdrawalOtpFromPaystack, approveWithdrawal, getAllPayouts, getPayoutById, rejectWithdrawal } from "../../controllers/adminCtrls/payoutCtrlr.js";
 import { admin, protect } from "../../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -22,5 +22,10 @@ route('/request-paystack-otp')
 router.
 route('/approve-withdrawal')
 .post(protect, admin, approveWithdrawal);
+
+//
+router.
+route('/reject-withdrawal')
+.post(protect, admin, rejectWithdrawal);
 
 export default router;

@@ -4,6 +4,7 @@ import Withdrawal from "../../models/withdrawalRequestModel.js"
 import { formatDate } from "../../utils/helperFunction.js"
 import mongoose from "mongoose"
 import { v4 as uuidv4 } from 'uuid'; 
+import Wallet from "../../models/walletModel.js"
 
 const generateTransferReference = () => {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -145,31 +146,24 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
             paystackKey = process.env.PAYSTACK_LIVE_SECRET_KEY;
         }
 
-        const recipientResponse = await axios.get(`https://api.paystack.co/transferrecipient/${existingWithdrawal.recipient_code}`, {
-            headers: { Authorization: `Bearer ${process.env.PAYSTACK_LIVE_SECRET_KEY}` },
-        });
-        console.log('Recipient Validation Response:', recipientResponse.data);
-
-        // const createRecipient = await axios.post(`https://api.paystack.co/transferrecipient`, {
-        //     type: "nuban",
-        //     name: existingWithdrawal.acc,
-        //     account_number: "1234567890",
-        //     bank_code: "058", // Example bank code
-        // }, { headers: { Authorization: `Bearer ${propaystackKey}` } });
+        // const recipientResponse = await axios.get(`https://api.paystack.co/transferrecipient/${existingWithdrawal.recipient_code}`, {
+        //     headers: { Authorization: `Bearer ${paystackKey}` },
+        // });
+        // console.log('Recipient Validation Response:', recipientResponse.data);
 
         // Make the request to Paystack
         const response = await axios.post(
             `https://api.paystack.co/transfer`,
             {
                 source: "balance",
-                amount: existingWithdrawal.withdrawalAmount * 100,  // Convert to kobo (cents)
+                amount: existingWithdrawal.withdrawalAmount * 100, 
                 recipient: existingWithdrawal.recipient_code,
                 reference: transferReference,
                 reason: "withdrawal from wallet",
             },
             {
                 headers: {
-                    Authorization: `Bearer ${process.env.PAYSTACK_LIVE_SECRET_KEY}`,
+                    Authorization: `Bearer ${paystackKey}`,
                 },
             }
         );
@@ -370,6 +364,78 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
             success: false,
             message: "Server error while approving withdrawal",
             error: error.message || error,
+        });
+    }
+});
+
+export const rejectWithdrawal = asyncHandler(async (req, res) => {
+    console.log("Admin rejecting space owner withdrawal...".yellow);
+
+    const { withdrawalId } = req.body;
+
+    if (!withdrawalId) {
+        console.log("Withdrawal ID is required".red);
+        return res.status(400).json({
+            success: false,
+            message: "Withdrawal ID is required",
+        });
+    }
+
+    // Start MongoDB session for transaction
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const existingWithdrawal = await Withdrawal.findById(withdrawalId)
+            .populate("user")
+            .session(session);
+
+        if (!existingWithdrawal) {
+            console.log("Withdrawal cannot be found".red);
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(404).json({
+                success: false,
+                message: "Withdrawal not found",
+            });
+        }
+
+        const existingWallet = await Wallet.findOne({ user: existingWithdrawal.user._id }).session(session);
+
+        if (!existingWallet) {
+            console.log("Wallet cannot be found".red);
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(404).json({
+                success: false,
+                message: "Wallet not found",
+            });
+        }
+
+        // Update wallet and withdrawal status
+        existingWallet.currentBalance += existingWithdrawal.withdrawalAmount;
+        existingWithdrawal.status = "rejected";
+
+        await existingWallet.save({ session });
+        await existingWithdrawal.save({ session });
+
+        await session.commitTransaction();
+        session.endSession();
+
+        console.log("Withdrawal successfully rejected".magenta);
+        return res.status(200).json({
+            success: true,
+            message: "Withdrawal successfully rejected",
+        });
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+
+        console.error("Error rejecting withdrawal", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error encountered while rejecting withdrawal",
+            error: error.message || "Internal Server Error",
         });
     }
 });
