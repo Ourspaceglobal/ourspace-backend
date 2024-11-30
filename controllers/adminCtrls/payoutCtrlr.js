@@ -146,18 +146,13 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
             paystackKey = process.env.PAYSTACK_LIVE_SECRET_KEY;
         }
 
-        // const recipientResponse = await axios.get(`https://api.paystack.co/transferrecipient/${existingWithdrawal.recipient_code}`, {
-        //     headers: { Authorization: `Bearer ${paystackKey}` },
-        // });
-        // console.log('Recipient Validation Response:', recipientResponse.data);
-
         // Make the request to Paystack
         const response = await axios.post(
             `https://api.paystack.co/transfer`,
             {
                 source: "balance",
                 amount: existingWithdrawal.withdrawalAmount * 100, 
-                recipient: existingWithdrawal.recipient_code,
+                recipient: "RCP_nznu65fo8uaf1iz",
                 reference: transferReference,
                 reason: "withdrawal from wallet",
             },
@@ -171,7 +166,7 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
         const { status, data } = response.data;
 
         if (!status) {
-            console.log("Error from Paystack: ", data);
+            console.log("Error from Paystack: ", data.data);
             await session.abortTransaction();
             session.endSession();
             return res.status(400).json({

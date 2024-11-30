@@ -8,6 +8,13 @@ import User from "../models/userModel.js";
 import Withdrawal from "../models/withdrawalRequestModel.js";
 import FundingHistory from "../models/fundingModel.js";
 
+let paystackKey;
+if (process.env.NODE_ENV === "development") {
+    paystackKey = process.env.PAYSTACK_TEST_SECRET_KEY;
+} else {
+    paystackKey = process.env.PAYSTACK_LIVE_SECRET_KEY;
+}
+
 export const spaceOwnerGetWallet = asyncHandler(async (req, res) => {
     console.log("Getting wallet dashboard...".blue);
 
@@ -295,7 +302,7 @@ export const spaceOwnerGetBanksAndSavedAccount = asyncHandler(async (req, res) =
     try {
         const response = await axios.get('https://api.paystack.co/bank', {
             headers: {
-                Authorization: `Bearer ${process.env.PAYSTACK_TEST_SECRET_KEY}`
+                Authorization: `Bearer ${paystack}`
             }
         });
 
@@ -445,7 +452,7 @@ export const spaceOwnerSaveNewAccountDetails = asyncHandler(async (req, res) => 
                 bank_code: bank_code
             },
             headers: {
-                Authorization: `Bearer ${process.env.PAYSTACK_TEST_SECRET_KEY}`
+                Authorization: `Bearer ${paystackKey}`
             }
         });
 
@@ -466,7 +473,7 @@ export const spaceOwnerSaveNewAccountDetails = asyncHandler(async (req, res) => 
                 },
                 {
                     headers: {
-                        Authorization: `Bearer ${process.env.PAYSTACK_TEST_SECRET_KEY}`,
+                        Authorization: `Bearer ${paystackKey}`,
                     }
                 }
             );
@@ -662,16 +669,7 @@ export const spaceOwnerInitiateWithdrawal = async (req, res) => {
     }
 };
 
-
-// 
-let paystackKey;
-if(process.env.NODE_ENV === "development"){
-    paystackKey = process.env.PAYSTACK_TEST_SECRET_KEY
-} else {
-    paystackKey = process.env.PAYSTACK_LIVE_SECRET_KEY
-}
-
-                                                 //  SPACE USERS WALLET TAB
+//  SPACE USERS WALLET TAB
 export const spaceUserGetWallet = asyncHandler(async(req, res) => {
     console.log("Space user get wallet endpoint".blue)
 
@@ -949,7 +947,7 @@ export const spaceUserInitialiseFundWallet = async (req, res) => {
             },
             {
                 headers: {
-                    Authorization: `Bearer ${process.env.PAYSTACK_TEST_SECRET_KEY}`,
+                    Authorization: `Bearer ${paystack}`,
                     'Content-Type': 'application/json',
                 },
             }
@@ -1021,7 +1019,7 @@ export const spaceUserVerifyWalletFunding = async (req, res) => {
     try {
         const response = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
             headers: {
-                Authorization: `Bearer ${process.env.PAYSTACK_TEST_SECRET_KEY}`
+                Authorization: `Bearer ${paystack}`
             }
         });
 
