@@ -134,7 +134,7 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
             });
         }
 
-        console.log("Recipient code: ", existingWithdrawal.recipient_code)
+        console.log("Recipient code: ", existingWithdrawal.recipient_code);
 
         const transferReference = generateTransferReference(); 
         console.log(`Generated Transfer Reference: ${transferReference}`.yellow); 
@@ -152,7 +152,7 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
             {
                 source: "balance",
                 amount: existingWithdrawal.withdrawalAmount * 100, 
-                recipient: "RCP_nznu65fo8uaf1iz",
+                recipient: existingWithdrawal.recipient_code,
                 reference: transferReference,
                 reason: "withdrawal from wallet",
             },
@@ -176,7 +176,7 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
             });
         }
 
-        console.log("transfer code: ", data.transfer_code)
+        console.log("transfer code: ", data.transfer_code);
 
         // Update withdrawal with Paystack data
         existingWithdrawal.paystack_id = data.id;
@@ -184,7 +184,7 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
         existingWithdrawal.transfer_code = data.transfer_code;
         existingWithdrawal.transferReference = transferReference;
 
-        console.log("transfer code: ", existingWithdrawal.transfer_code)
+        console.log("transfer code: ", existingWithdrawal.transfer_code);
 
         await existingWithdrawal.save({ session });
 
@@ -208,6 +208,25 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
         await session.abortTransaction();
         session.endSession();
 
+        // Enhanced error handling
+        if (error.response && error.response.data) {
+            const errorData = error.response.data; // Extract error response from Paystack
+            console.log("Paystack Error:", {
+                code: errorData.code,
+                message: errorData.message,
+                status: errorData.status,
+            });
+            return res.status(400).json({
+                success: false,
+                message: "Paystack error occurred",
+                error: {
+                    code: errorData.code,
+                    message: errorData.message,
+                    status: errorData.status,
+                },
+            });
+        }
+
         console.log(error);
         return res.status(500).json({
             success: false,
@@ -216,6 +235,7 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
         });
     }
 });
+
 
 
 export const approveWithdrawal = asyncHandler(async (req, res) => {
