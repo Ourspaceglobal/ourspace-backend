@@ -231,8 +231,6 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
     }
 });
 
-
-
 export const approveWithdrawal = asyncHandler(async (req, res) => {
     console.log("Admin approving withdrawal from Paystack".cyan);
 
@@ -275,10 +273,10 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
         }
 
         let paystackKey;
-        if(process.env.NODE_ENV === "development") {
-            paystackKey = process.env.PAYSTACK_TEST_SECRET_KEY
+        if (process.env.NODE_ENV === "development") {
+            paystackKey = process.env.PAYSTACK_TEST_SECRET_KEY;
         } else {
-            paystackKey = process.env.PAYSTACK_LIVE_SECRET_KEY
+            paystackKey = process.env.PAYSTACK_LIVE_SECRET_KEY;
         }
 
         if (!paystackKey) {
@@ -290,7 +288,6 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
         }
 
         try {
-
             const response = await axios.post(
                 `https://api.paystack.co/transfer/finalize_transfer`,
                 {
@@ -304,22 +301,29 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
                 }
             );
         
-            // Log only the essential fields
             const { status, data, message } = response.data;
 
             console.log("Transfer State: ", response.data);
 
             if (status) {
-                
-                existingWithdrawal.paystack_status = "success",
-                existingWithdrawal.status = "completed"
-                
+                // Update the withdrawal object
+                existingWithdrawal.paystack_status = "success";
+                existingWithdrawal.status = "completed";
+
+                // Save the withdrawal record within the transaction
                 await existingWithdrawal.save({ session });
                 
+                // Commit the transaction to ensure changes are saved
+                await session.commitTransaction();
+                session.endSession();
+
                 console.log(`Paystack OTP Verification Successful`.rainbow);
                 
             } else {
                 console.log(`Paystack OTP Verification Failed: ${message}`.red);
+
+                await session.abortTransaction();
+                session.endSession();
 
                 return res.status(500).json({
                     success: false,
@@ -331,10 +335,6 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
                 });
             }
 
-            await session.commitTransaction();
-            session.endSession();
-        
-            // Return the formatted response if needed
             return res.status(200).json({
                 success: true,
                 message: "Withdrawal successfully approved",
@@ -352,9 +352,11 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
             } else if (error.request) {
                 console.log("No response received: ", error.request);
             } else {
-                // Something happened in setting up the request
                 console.log("Error in request setup: ", error.message);
             }
+
+            await session.abortTransaction();
+            session.endSession();
 
             return res.status(500).json({
                 success: false,
