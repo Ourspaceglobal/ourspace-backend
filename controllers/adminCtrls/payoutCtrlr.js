@@ -146,9 +146,16 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
         }
 
         const recipientResponse = await axios.get(`https://api.paystack.co/transferrecipient/${existingWithdrawal.recipient_code}`, {
-            headers: { Authorization: `Bearer ${PAYSTACK_TEST_SECRET_KEY}` },
+            headers: { Authorization: `Bearer ${process.env.PAYSTACK_TEST_SECRET_KEY}` },
         });
         console.log('Recipient Validation Response:', recipientResponse.data);
+
+        // const createRecipient = await axios.post(`https://api.paystack.co/transferrecipient`, {
+        //     type: "nuban",
+        //     name: existingWithdrawal.acc,
+        //     account_number: "1234567890",
+        //     bank_code: "058", // Example bank code
+        // }, { headers: { Authorization: `Bearer ${propaystackKey}` } });
 
         // Make the request to Paystack
         const response = await axios.post(
@@ -162,7 +169,7 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
             },
             {
                 headers: {
-                    Authorization: `Bearer ${PAYSTACK_TEST_SECRET_KEY}`,
+                    Authorization: `Bearer ${process.env.PAYSTACK_TEST_SECRET_KEY}`,
                 },
             }
         );
