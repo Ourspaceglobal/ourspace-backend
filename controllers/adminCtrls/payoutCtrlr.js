@@ -289,9 +289,6 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
             });
         }
 
-        const transferReference = existingWithdrawal.transferReference;
-        console.log("Transfer code: ",transferReference)
-
         try {
 
             const response = await axios.post(
@@ -333,6 +330,9 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
                     },
                 });
             }
+
+            await session.commitTransaction();
+            session.endSession();
         
             // Return the formatted response if needed
             return res.status(200).json({
@@ -377,19 +377,24 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
     }
 });
 
+// Paystack Webhook Endpoint
 export const paystackWebhook = asyncHandler(async (req, res) => {
-    const secret = process.env.PAYSTACK_WEBHOOK_SECRET;
+    const secret = process.env.PAYSTACK_WEBHOOK_SECRET; 
     const signature = req.headers['x-paystack-signature'];
 
-    // Validate signature
-    const crypto = require('crypto');
-    const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(req.body)).digest('hex');
+    // Validate the request signature
+    const hash = crypto.createHmac('sha512', secret)
+        .update(JSON.stringify(req.body))
+        .digest('hex');
 
     if (hash !== signature) {
-        return res.status(401).json({ message: 'Invalid signature' });
+        console.log('Invalid webhook signature');
+        return res.status(401).json({ success: false, message: 'Invalid signature' });
     }
 
     const { event, data } = req.body;
+
+    console.log(`Webhook event received: ${event}`);
 
     if (event === 'transfer.success') {
         const withdrawal = await Withdrawal.findOne({ transfer_code: data.transfer_code });
@@ -397,6 +402,7 @@ export const paystackWebhook = asyncHandler(async (req, res) => {
             withdrawal.status = 'completed';
             withdrawal.paystack_status = 'success';
             await withdrawal.save();
+            console.log(`Withdrawal ${withdrawal._id} marked as completed`);
         }
     } else if (event === 'transfer.failed') {
         const withdrawal = await Withdrawal.findOne({ transfer_code: data.transfer_code });
@@ -404,10 +410,15 @@ export const paystackWebhook = asyncHandler(async (req, res) => {
             withdrawal.status = 'failed';
             withdrawal.paystack_status = 'failed';
             await withdrawal.save();
+            console.log(`Withdrawal ${withdrawal._id} marked as failed`);
         }
+    } else {
+        console.log(`Unhandled event type: ${event}`);
     }
 
-    res.status(200).send();
+    // Always return a 200 status for Paystack
+    console.log(`Webhook received${event}`.magenta)
+    res.status(200).send('Webhook received');
 });
 
 export const rejectWithdrawal = asyncHandler(async (req, res) => {

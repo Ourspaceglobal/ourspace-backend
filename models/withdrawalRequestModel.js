@@ -55,7 +55,7 @@ const withdrawalSchema = new mongoose.Schema({
     },
     paystack_status: {
         type: String,
-        enum: ["otp", "pending", "completed", "success"],
+        enum: ["otp", "pending", "completed", "success", "failed"],
         default: "otp",
         required: true
     },
