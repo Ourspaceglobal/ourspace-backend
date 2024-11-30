@@ -146,7 +146,7 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
         }
 
         const recipientResponse = await axios.get(`https://api.paystack.co/transferrecipient/${existingWithdrawal.recipient_code}`, {
-            headers: { Authorization: `Bearer ${paystackKey}` },
+            headers: { Authorization: `Bearer ${PAYSTACK_TEST_SECRET_KEY}` },
         });
         console.log('Recipient Validation Response:', recipientResponse.data);
 
@@ -162,7 +162,7 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
             },
             {
                 headers: {
-                    Authorization: `Bearer ${paystackKey}`,
+                    Authorization: `Bearer ${PAYSTACK_TEST_SECRET_KEY}`,
                 },
             }
         );
