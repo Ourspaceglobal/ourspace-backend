@@ -133,6 +133,8 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
             });
         }
 
+        console.log("Recipient code: ", existingWithdrawal.recipient_code)
+
         const transferReference = generateTransferReference(); 
         console.log(`Generated Transfer Reference: ${transferReference}`.yellow); 
 
@@ -143,7 +145,7 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
             paystackKey = process.env.PAYSTACK_LIVE_SECRET_KEY;
         }
 
-        const recipientResponse = await axios.get(`https://api.paystack.co/transferrecipient/${recipient_code}`, {
+        const recipientResponse = await axios.get(`https://api.paystack.co/transferrecipient/${existingWithdrawal.recipient_code}`, {
             headers: { Authorization: `Bearer ${paystackKey}` },
         });
         console.log('Recipient Validation Response:', recipientResponse.data);
