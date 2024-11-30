@@ -302,7 +302,7 @@ export const spaceOwnerGetBanksAndSavedAccount = asyncHandler(async (req, res) =
     try {
         const response = await axios.get('https://api.paystack.co/bank', {
             headers: {
-                Authorization: `Bearer ${paystack}`
+                Authorization: `Bearer ${paystackKey}`
             }
         });
 
@@ -947,7 +947,7 @@ export const spaceUserInitialiseFundWallet = async (req, res) => {
             },
             {
                 headers: {
-                    Authorization: `Bearer ${paystack}`,
+                    Authorization: `Bearer ${paystackKey}`,
                     'Content-Type': 'application/json',
                 },
             }
@@ -1019,7 +1019,7 @@ export const spaceUserVerifyWalletFunding = async (req, res) => {
     try {
         const response = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
             headers: {
-                Authorization: `Bearer ${paystack}`
+                Authorization: `Bearer ${paystackKey}`
             }
         });
 
