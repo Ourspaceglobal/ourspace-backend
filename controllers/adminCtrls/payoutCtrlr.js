@@ -210,14 +210,14 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
 
         if (error.response && error.response.data) {
             const errorData = error.response.data; 
-            console.log("Error:", {
+            console.log("Paystack Error:", {
                 code: errorData.code,
                 message: errorData.message,
                 status: errorData.status,
             });
             return res.status(400).json({
                 success: false,
-                message: `Error: ${errorData.message}`,
+                message: `Paystack Error: ${errorData.message}`,
                 error: {
                     code: errorData.code,
                     message: errorData.message,

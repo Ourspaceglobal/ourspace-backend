@@ -675,6 +675,7 @@ export const bookWithWallet = asyncHandler(async (req, res) => {
             bookedDays: uniqueBookedDays,
             totalGuest,
             chargePerNight: listing.chargePerNight,
+            chargePerNightWithout10Percent: listing.chargePerNightWithout10Percent,
             totalNight: totalNights,
             totalIncuredCharge: amountIncurred,
             totalIncuredChargeAfterDiscount: amountIncurred - (discount || 0),
