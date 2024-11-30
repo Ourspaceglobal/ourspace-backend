@@ -15,6 +15,17 @@ if (process.env.NODE_ENV === "development") {
     paystackKey = process.env.PAYSTACK_LIVE_SECRET_KEY;
 }
 
+const generateTransferReference = () => {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let reference = '';
+    
+    for (let i = 0; i < 16; i++) {
+        reference += characters.charAt(Math.floor(Math.random() * characters.length));
+    } 
+
+    return reference;
+};
+
 export const spaceOwnerGetWallet = asyncHandler(async (req, res) => {
     console.log("Getting wallet dashboard...".blue);
 
@@ -607,7 +618,7 @@ export const spaceOwnerInitiateWithdrawal = async (req, res) => {
             accountNumberWithdrawnTo: matchingBank.accountNumber,
             bankNameWithdrawnTo: matchingBank.bankName,
             recipient_code: recipient_code,
-            reason: "Withdrawal from wallet"
+            reason: "Withdrawal from wallet"  
         });
 
         await newWithdrawal.save();
@@ -642,6 +653,7 @@ export const spaceOwnerInitiateWithdrawal = async (req, res) => {
 
         // Format the response
         const formattedWithdrawal = {
+            id: latestWithdrawal._id,
             user: req.user._id,
             transactionId: latestWithdrawal.transactionId,
             methodOfWithdrawal: latestWithdrawal.methodOfWithdrawal,
@@ -650,6 +662,7 @@ export const spaceOwnerInitiateWithdrawal = async (req, res) => {
             withdrawalAmount: latestWithdrawal.withdrawalAmount,
             status: latestWithdrawal.status,
             bankNameWithdrawnTo: latestWithdrawal.bankNameWithdrawnTo,
+            transferReference: latestWithdrawal.transferReference,
             recipient_code: latestWithdrawal.recipient_code,
             reason: latestWithdrawal.reason
         };

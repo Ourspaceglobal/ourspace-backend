@@ -12,7 +12,7 @@ const generateTransferReference = () => {
     
     for (let i = 0; i < 16; i++) {
         reference += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
+    } 
 
     return reference;
 };
@@ -136,9 +136,6 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
 
         console.log("Recipient code: ", existingWithdrawal.recipient_code);
 
-        const transferReference = generateTransferReference(); 
-        console.log(`Generated Transfer Reference: ${transferReference}`.yellow); 
-
         let paystackKey;
         if (process.env.NODE_ENV === "development") {
             paystackKey = process.env.PAYSTACK_TEST_SECRET_KEY;
@@ -153,7 +150,7 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
                 source: "balance",
                 amount: existingWithdrawal.withdrawalAmount * 100, 
                 recipient: existingWithdrawal.recipient_code,
-                reference: transferReference,
+                reference: existingWithdrawal.transferReference,
                 reason: "withdrawal from wallet",
             },
             {
@@ -182,7 +179,6 @@ export const adminRequestWithdrawalOtpFromPaystack = asyncHandler(async (req, re
         existingWithdrawal.paystack_id = data.id;
         existingWithdrawal.paystack_status = data.status;
         existingWithdrawal.transfer_code = data.transfer_code;
-        existingWithdrawal.transferReference = transferReference;
 
         console.log("transfer code: ", existingWithdrawal.transfer_code);
 
@@ -278,10 +274,12 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
             });
         }
 
-        // Variables needed for Paystack API request
-        const paystackKey = process.env.NODE_ENV === "development" 
-            ? process.env.PAYSTACK_TEST_SECRET_KEY
-            : process.env.PAYSTACK_LIVE_SECRET_KEY;
+        let paystackKey;
+        if(process.env.NODE_ENV === "development") {
+            paystackKey = process.env.PAYSTACK_TEST_SECRET_KEY
+        } else {
+            paystackKey = process.env.PAYSTACK_LIVE_SECRET_KEY
+        }
 
         if (!paystackKey) {
             console.log("Paystack API key is missing or invalid".red);
@@ -291,8 +289,8 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
             });
         }
 
-        const transferCode = existingWithdrawal.transfer_code;
-        console.log("Transfer code: ",transferCode)
+        const transferReference = existingWithdrawal.transferReference;
+        console.log("Transfer code: ",transferReference)
 
         try {
 
@@ -300,7 +298,7 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
                 `https://api.paystack.co/transfer/finalize_transfer`,
                 {
                     otp, 
-                    transfer_code: transferCode,  // Pass the generated transfer reference
+                    transfer_code: existingWithdrawal.transfer_code,  // Pass the generated transfer reference
                 },
                 {
                     headers: {
@@ -313,9 +311,6 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
             const { status, data, message } = response.data;
 
             console.log("Transfer State: ", response.data);
-
-            // Debugging response data to see what we are getting
-            console.log("Paystack Response: ", response.data);
 
             if (status) {
                 
@@ -380,6 +375,39 @@ export const approveWithdrawal = asyncHandler(async (req, res) => {
             error: error.message || error,
         });
     }
+});
+
+export const paystackWebhook = asyncHandler(async (req, res) => {
+    const secret = process.env.PAYSTACK_WEBHOOK_SECRET;
+    const signature = req.headers['x-paystack-signature'];
+
+    // Validate signature
+    const crypto = require('crypto');
+    const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(req.body)).digest('hex');
+
+    if (hash !== signature) {
+        return res.status(401).json({ message: 'Invalid signature' });
+    }
+
+    const { event, data } = req.body;
+
+    if (event === 'transfer.success') {
+        const withdrawal = await Withdrawal.findOne({ transfer_code: data.transfer_code });
+        if (withdrawal) {
+            withdrawal.status = 'completed';
+            withdrawal.paystack_status = 'success';
+            await withdrawal.save();
+        }
+    } else if (event === 'transfer.failed') {
+        const withdrawal = await Withdrawal.findOne({ transfer_code: data.transfer_code });
+        if (withdrawal) {
+            withdrawal.status = 'failed';
+            withdrawal.paystack_status = 'failed';
+            await withdrawal.save();
+        }
+    }
+
+    res.status(200).send();
 });
 
 export const rejectWithdrawal = asyncHandler(async (req, res) => {

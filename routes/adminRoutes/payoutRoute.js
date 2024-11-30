@@ -25,6 +25,11 @@ route('/approve-withdrawal')
 
 //
 router.
+route('/withdrawal-webhook')
+.post(approveWithdrawal);
+
+//
+router.
 route('/reject-withdrawal')
 .post(protect, admin, rejectWithdrawal);
 
