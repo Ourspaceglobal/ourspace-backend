@@ -85,7 +85,7 @@ const superAdmin = (req, res, next) => {
   } else {
     return res.status(403).json({
       success: false,
-      message: 'Access denied, yes you are an admin, but access for this fundtion is only available for super admins'
+      message: 'Access denied, yes you are an admin, but access for this function is only available for super admins'
     });
   }
 };
