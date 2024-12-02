@@ -80,7 +80,7 @@ const admin = (req, res, next) => {
 };
 
 const superAdmin = (req, res, next) => {
-  if (req.user && req.user.isAdmin && req.user.role === "super-user") {
+  if (req.user && req.user.isAdmin && req.user.role === "super-admin") {
     next();
   } else {
     return res.status(403).json({
