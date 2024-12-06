@@ -527,7 +527,7 @@ const getSingleListing = asyncHandler(async (req, res) => {
         totalStar: reviewStats.totalStarRating || 0,
         cleanliness: reviewStats.totalCleanliness || 0,
         value: reviewStats.totalValue || 0,
-        accuracy: reviewStats.accuracy || 0,
+        accuracy: reviewStats.totalAccuracy || 0,
         service: reviewStats.totalService || 0,
         facilities: reviewStats.totalFacilities || 0,
         location: reviewStats.totalLocation || 0
