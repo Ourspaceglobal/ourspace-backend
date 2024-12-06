@@ -541,7 +541,7 @@ const getSingleListing = asyncHandler(async (req, res) => {
         experience: review.userExperience,
         totalReviewLikes: review.totalReviewLikes,
         totalReviewDislikes: review.totalReviewDislikes,
-        createdAt: formatDateWithoutTime(review.createdAt)
+        createdAt: review.createdAt
       }))
       
       console.log("Listing found".green);

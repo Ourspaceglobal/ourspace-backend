@@ -15,7 +15,7 @@ import {
     updateInvoiceIdsForBookings,
     soGetSingleListingById
  } from '../controllers/listingCtrls.js';
-import upload from '../uploadUtils/multer.js';
+import upload from '../uploadUtils/multer.js';  
 
 const router = express.Router();
 

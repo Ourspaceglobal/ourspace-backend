@@ -30,6 +30,8 @@ const walletSchema = new mongoose.Schema({
         type: Number,
         default: 0
     }
+}, {
+    timestamps: true
 })
 
 const Wallet = mongoose.model('Wallet', walletSchema);

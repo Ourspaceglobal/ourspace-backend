@@ -77,7 +77,7 @@ const withdrawalSchema = new mongoose.Schema({
         type: Date 
     }
 }, {
-    timestamps: true // Adds createdAt and updatedAt timestamps automatically
+    timestamps: true
 });
 
 withdrawalSchema.pre('save', async function (next) {

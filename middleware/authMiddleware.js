@@ -66,7 +66,6 @@ const spaceOwner = (req, res, next) => {
   }
 }
 
-
 // User must be an admin
 const admin = (req, res, next) => {
   if (req.user && req.user.isAdmin) {
