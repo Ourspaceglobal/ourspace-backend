@@ -787,33 +787,80 @@ const getAllListingForHomepage = asyncHandler(async (req, res) => {
   try {
     // Fetch listings with status 'listed', sorted by price (ascending) and then by updatedAt (descending)
     const availableListings = await Listing.find({ status: "listed" })
-      .sort({ chargePerNight: 1, updatedAt: -1 }); // 1 for ascending, -1 for descending
+      .sort({ chargePerNight: 1, updatedAt: -1 });
 
-    if (!availableListings || availableListings.length < 1) {
+    if (!availableListings || availableListings.length === 0) {
       console.log("No listings found".red);
       return res.status(200).json({
         success: true,
         message: "No listings found at the moment, please check back later.",
-        data: []
+        data: [],
       });
     }
+
+    // Create a mapping of review stats to listings
+    const listingIds = availableListings.map(listing => listing._id);
+
+    const reviewStats = await ReviewStats.find({ listing: { $in: listingIds } });
+    const reviewStatsMap = new Map();
+
+    for (const stats of reviewStats) {
+      reviewStatsMap.set(stats.listing.toString(), stats);
+    }
+
+    // Ensure all listings have associated review stats
+    for (const listing of availableListings) {
+      const listingId = listing._id.toString();
+
+      if (!reviewStatsMap.has(listingId)) {
+        // If no stats exist for a listing, create a new one
+        const newReviewStats = await ReviewStats.create({
+          listing: listing._id,
+          totalReviews: 0,
+          totalStarRating: 0,
+          totalCleanliness: 0,
+          totalAccuracy: 0,
+          totalValue: 0,
+          totalService: 0,
+          totalFacility: 0,
+          totalLocation: 0,
+        });
+
+        reviewStatsMap.set(listingId, newReviewStats);
+      }
+    }
+
+    // Format listings for response
+    const formattedListings = availableListings.map((listing) => {
+      const stats = reviewStatsMap.get(listing._id.toString()) || {};
+      return {
+        id: listing._id,
+        propertyName: listing.propertyName,
+        city: listing.city,
+        displayImage: listing.bedroomPictures?.[0] || listing.livingRoomPictures?.[0] || null,
+        totalStarRating: stats.totalStarRating || 0,
+        bedroomTotal: listing.bedroomTotal,
+        maximumAllowedGuests: listing.maximumGuestNumber,
+        chargePerNight: listing.chargePerNight,
+      };
+    });
 
     console.log(`Total of ${availableListings.length} listings found`.green);
 
     return res.status(200).json({
       success: true,
       message: `Total of ${availableListings.length} listings found.`,
-      data: availableListings
+      data: formattedListings,
     });
-
   } catch (error) {
     console.error("Error fetching listings for homepage:", error);
     return res.status(500).json({
       success: false,
-      message: "Error fetching listings for homepage, please try again later."
+      message: "Error fetching listings for homepage, please try again later.",
     });
   }
 });
+
 
 
 const getListingByCategory = asyncHandler(async (req, res) => {

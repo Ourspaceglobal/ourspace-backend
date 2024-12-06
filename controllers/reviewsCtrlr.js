@@ -137,13 +137,31 @@ export const addNewReview = asyncHandler(async (req, res) => {
         }
 
         reviewStats.totalReviews += 1;
-        reviewStats.totalStarRating = ((reviewStats.totalStarRating * (reviewStats.totalReviews - 1)) + parseFloat(starValue.trim())) / reviewStats.totalReviews;
-        reviewStats.totalCleanliness = ((reviewStats.totalCleanliness * (reviewStats.totalReviews - 1)) + parseFloat(cleanliness.trim())) / reviewStats.totalReviews;
-        reviewStats.totalAccuracy = ((reviewStats.totalAccuracy * (reviewStats.totalReviews - 1)) + parseFloat(accuracy.trim())) / reviewStats.totalReviews;
-        reviewStats.totalValue = ((reviewStats.totalValue * (reviewStats.totalReviews - 1)) + parseFloat(value.trim())) / reviewStats.totalReviews;
-        reviewStats.totalService = ((reviewStats.totalService * (reviewStats.totalReviews - 1)) + parseFloat(service.trim())) / reviewStats.totalReviews;
-        reviewStats.totalFacilities = ((reviewStats.totalFacilities * (reviewStats.totalReviews - 1)) + parseFloat(facilities.trim())) / reviewStats.totalReviews;
-        reviewStats.totalLocation = ((reviewStats.totalLocation * (reviewStats.totalReviews - 1)) + parseFloat(location.trim())) / reviewStats.totalReviews;
+
+        // Helper function to round to 2 decimal places
+        const roundToTwo = (num) => Math.round(num * 100) / 100;
+
+        reviewStats.totalStarRating = roundToTwo(
+        ((reviewStats.totalStarRating * (reviewStats.totalReviews - 1)) + parseFloat(starValue.trim())) / reviewStats.totalReviews
+        );
+        reviewStats.totalCleanliness = roundToTwo(
+        ((reviewStats.totalCleanliness * (reviewStats.totalReviews - 1)) + parseFloat(cleanliness.trim())) / reviewStats.totalReviews
+        );
+        reviewStats.totalAccuracy = roundToTwo(
+        ((reviewStats.totalAccuracy * (reviewStats.totalReviews - 1)) + parseFloat(accuracy.trim())) / reviewStats.totalReviews
+        );
+        reviewStats.totalValue = roundToTwo(
+        ((reviewStats.totalValue * (reviewStats.totalReviews - 1)) + parseFloat(value.trim())) / reviewStats.totalReviews
+        );
+        reviewStats.totalService = roundToTwo(
+        ((reviewStats.totalService * (reviewStats.totalReviews - 1)) + parseFloat(service.trim())) / reviewStats.totalReviews
+        );
+        reviewStats.totalFacilities = roundToTwo(
+        ((reviewStats.totalFacilities * (reviewStats.totalReviews - 1)) + parseFloat(facilities.trim())) / reviewStats.totalReviews
+        );
+        reviewStats.totalLocation = roundToTwo(
+        ((reviewStats.totalLocation * (reviewStats.totalReviews - 1)) + parseFloat(location.trim())) / reviewStats.totalReviews
+        );
 
         await reviewStats.save({ session });
         await session.commitTransaction();

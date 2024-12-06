@@ -39,6 +39,8 @@ const reviewStatsSchema = new mongoose.Schema({
         type: Number,
         default: 0
     }
+}, {
+    timstamps: true
 });
 
 const ReviewStats = mongoose.model('ReviewStats', reviewStatsSchema);
