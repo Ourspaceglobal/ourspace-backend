@@ -203,11 +203,7 @@ export const likeOrDislikeReview = asyncHandler(async (req, res) => {
 
     const { listingId } = req.params; 
     const { reviewId, likeOrDislike } = req.body;
-    const userId = req.user._id; 
-
-    console.log("Listing: ", listingId)
-    console.log("review Id: ", reviewId)
-    console.log("like or dislike: ", likeOrDislike)
+    const userId = req.user._id;
 
     // Validate inputs
     if (!listingId || !reviewId || !likeOrDislike) {

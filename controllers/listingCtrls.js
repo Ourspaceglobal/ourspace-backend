@@ -534,7 +534,7 @@ const getSingleListing = asyncHandler(async (req, res) => {
       }
 
       const formattedReviews = reviews.map((review) => ({
-        id: review.user._id,
+        id: review._id,
         star: review.starValue,
         title: review.title,
         subtitle: review.subTitle,
