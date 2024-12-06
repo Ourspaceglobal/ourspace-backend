@@ -833,14 +833,20 @@ const getAllListingForHomepage = asyncHandler(async (req, res) => {
     // Format listings for response
     const formattedListings = availableListings.map((listing) => {
       const stats = reviewStatsMap.get(listing._id.toString()) || {};
+      const maximumGuests = listing.maximumGuestNumber || {}; // Fallback to empty object
+      const adultGuests = maximumGuests.adult || 0; // Default to 0 if undefined
+      const childrenGuests = maximumGuests.children || 0; // Default to 0 if undefined
+      const totalGuests = adultGuests + childrenGuests; // Calculate total
+
       return {
         id: listing._id,
         propertyName: listing.propertyName,
-        city: listing.city,
+        city: listing.propertyLocation.city,
+        state: listing.propertyLocation.state,
         displayImage: listing.bedroomPictures?.[0] || listing.livingRoomPictures?.[0] || null,
         totalStarRating: stats.totalStarRating || 0,
         bedroomTotal: listing.bedroomTotal,
-        maximumAllowedGuests: listing.maximumGuestNumber,
+        maximumAllowedGuests: listing.totalGuestsAllowed,
         chargePerNight: listing.chargePerNight,
       };
     });
