@@ -201,7 +201,7 @@ export const addNewReview = asyncHandler(async (req, res) => {
 export const likeOrDislikeReview = asyncHandler(async (req, res) => {
     console.log("User updating a review reaction".cyan);
 
-    const { listingId } = req.params;
+    const { listingId } = req.params; 
     const { reviewId, likeOrDislike } = req.body;
     const userId = req.user._id; 
 
