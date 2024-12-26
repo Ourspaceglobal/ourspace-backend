@@ -843,7 +843,7 @@ const getAllListingForHomepage = asyncHandler(async (req, res) => {
         propertyName: listing.propertyName,
         city: listing.propertyLocation.city,
         state: listing.propertyLocation.state,
-        displayImage: listing.bedroomPictures?.[0] || listing.livingRoomPictures?.[0] || null,
+        displayImage: listing.livingRoomPictures?.[0] || listing.bedroomPictures?.[0] || null,
         totalStarRating: stats.totalStarRating || 0,
         bedroomTotal: listing.bedroomTotal,
         maximumAllowedGuests: listing.totalGuestsAllowed,

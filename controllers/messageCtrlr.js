@@ -368,6 +368,26 @@ const sendMessage = asyncHandler(async (data) => {
       }
     }
 
+    const lastMessage = await Message.find({
+      sender: senderId,
+      receiver: receiverUser._id,
+      listing: propertyListing._id
+    }).sort({createdAt: -1})
+
+    if (lastMessage && lastMessage[0]?.content === content) {
+      console.log("Last message content is the same as the new message content");
+    
+      const currentDate = new Date();
+      const timeDifference = (currentDate - lastMessage[0].createdAt) / 1000; // Time difference in seconds
+    
+      if (timeDifference <= 2) {
+        console.log("Message sent within 2 seconds of the last message. Skipping duplicate save.");
+        return {
+          success: false,
+          message: "Duplicate message detected. Message not sent again.",
+        };
+      }
+    }
 
     // Create and save the message
     const newMessage = new Message({
@@ -521,6 +541,8 @@ const chatWithSpaceOwner = asyncHandler(async (req, res) => {
           listing: listing._id
       }).sort({ createdAt: -1 }); // Sort to get the latest message
 
+      const defaultContent = `I'm interested in the ${listing.propertyName} at ${listing.propertyLocation.city}, " " ${listing.propertyLocation.state} and have a few questions. Could you please provide more details?`
+
       // If there’s an existing chat, check the content of the last message
       if (existingChat) {
           const lastMessage = await Message.findOne({
@@ -530,10 +552,10 @@ const chatWithSpaceOwner = asyncHandler(async (req, res) => {
           }).sort({ createdAt: -1 });
 
           // Check if the last message content starts with "New discussion on"
-          if (lastMessage && lastMessage.content.startsWith("   ")) {
+          if (lastMessage && lastMessage.content.startsWith(defaultContent)) {
               // Delete the last message if it starts with "New discussion on"
               await Message.findByIdAndDelete(lastMessage._id);
-              console.log(`Deleted previous "   " message with ID: ${lastMessage._id}`.yellow);
+              console.log(`Deleted previous message with ID: ${lastMessage._id}`.yellow);
           }
       }
 
@@ -542,7 +564,7 @@ const chatWithSpaceOwner = asyncHandler(async (req, res) => {
           sender: user._id,
           receiver: listing.user._id,
           listing: listing._id,
-          content: `   `
+          content: defaultContent
       });
 
       console.log("New chat created between space user and owner.".green);
