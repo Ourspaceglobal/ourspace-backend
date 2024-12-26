@@ -1,6 +1,6 @@
 import pdf from 'html-pdf';
 import { generateBookingPDFHtml, generateWithdrawalPDFHtml } from "../email_templates/invoicePdf.js";
-import { format, parseISO } from 'date-fns';
+import { parseISO, format, addDays } from 'date-fns';
 
 // Function to format the date
 export const formatDate = (date) => {
@@ -37,7 +37,15 @@ export const formatBookedDays = (bookedDays) => {
     if (bookedDays.length < 1) return "";
 
     const startDate = parseISO(bookedDays[0]);
-    const endDate = parseISO(bookedDays[bookedDays.length - 1]);
+    let endDate;
+
+    if (bookedDays.length === 1) {
+        // If only one day is booked, the end date should be the next day
+        endDate = addDays(startDate, 1);
+    } else {
+        // Otherwise, use the last day in the array
+        endDate = parseISO(bookedDays[bookedDays.length - 1]);
+    }
 
     // Format each date using 'E. MMM d, yyyy' pattern
     const startDateFormatted = format(startDate, "EEE. MMM d, yyyy");
