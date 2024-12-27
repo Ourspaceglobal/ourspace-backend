@@ -6,6 +6,7 @@ import Message from "../models/messageModel.js"
 import Listing from "../models/listingModel.js";
 import DraftListing from "../models/draftListingModel.js";
 import { formatBookedDays } from "../utils/helperFunction.js";
+import { parseISO, isBefore, isAfter, isEqual } from 'date-fns';
 
 
 const getSpaceUserDashboard = asyncHandler(async (req, res) => {
@@ -144,22 +145,31 @@ const getAllSUBookings = asyncHandler(async (req, res) => {
 
     // Iterate over bookings and update status
     for (let booking of bookings) {
-        const firstBookedDay = booking.bookedDays[0];
-        const lastBookedDay = booking.bookedDays[booking.bookedDays.length - 1];
-
-        if(booking.paymentStatus === "completed") {
-            if (currentDate < firstBookedDay) {
-                // Booking is in the future
-                booking.bookingStatus = 'upcoming';
-            } else if (currentDate >= firstBookedDay && currentDate <= lastBookedDay) {
-                // Booking is currently in-progress
-                booking.bookingStatus = 'in-progress';
-            } else if (currentDate > lastBookedDay) {
-                // Booking is completed
-                booking.bookingStatus = 'completed';
+        // Ensure bookedDays is not empty and the dates are valid ISO strings
+        if (booking.bookedDays.length > 0 && typeof booking.bookedDays[0] === 'string') {
+            const firstBookedDay = parseISO(booking.bookedDays[0]); // Parse the first day
+            const lastBookedDay = parseISO(booking.bookedDays[booking.bookedDays.length - 1]); // Parse the last day
+            const currentDateObj = parseISO(currentDate); // Parse the current date
+    
+            if (booking.paymentStatus === "completed") {
+                if (isBefore(currentDateObj, firstBookedDay)) {
+                    // Booking is in the future
+                    booking.bookingStatus = 'upcoming';
+                } else if (
+                    (isEqual(currentDateObj, firstBookedDay) || isEqual(currentDateObj, lastBookedDay)) ||
+                    (isAfter(currentDateObj, firstBookedDay) && isBefore(currentDateObj, lastBookedDay))
+                ) {
+                    // Booking is currently in-progress
+                    booking.bookingStatus = 'in-progress';
+                } else if (isAfter(currentDateObj, lastBookedDay)) {
+                    // Booking is completed
+                    booking.bookingStatus = 'completed';
+                }
             }
+        } else {
+            console.error("Invalid or empty 'bookedDays' array for booking:", booking._id);
         }
-
+    
         await booking.save(); // Save the updated status
     }
 
@@ -486,10 +496,6 @@ const getSpaceOwnerDashboard = asyncHandler(async (req, res) => {
     }
 });
 
-const format = asyncHandler(async(req, res)=> {
-    console.log("getting all space user bookings".yellow)
-})
-
 const helperLogic = asyncHandler(async (req, res) => {
     console.log("Making use of helper functions".yellow);
 
@@ -597,11 +603,6 @@ const cancelBooking = asyncHandler(async (req, res) => {
         });
     }
 });
-
-
-
-
-
 
 export {
     getSpaceUserDashboard,
