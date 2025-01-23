@@ -22,6 +22,12 @@ const notificationSchema = new mongoose.Schema({
     },
     displayImage: {
         type: String
+    },
+    notificationStatus: {
+        type: String,
+        enum: ["read", "unread"],
+        required: true,
+        default: "read",
     }
 },{
     timestamps : true

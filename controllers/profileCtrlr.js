@@ -7,7 +7,8 @@ import Listing from "../models/listingModel.js";
 import DraftListing from "../models/draftListingModel.js";
 import { formatBookedDays } from "../utils/helperFunction.js";
 import { parseISO, isBefore, isAfter, isEqual } from 'date-fns';
-
+import colors from "colors";
+import mongoose from "mongoose";
 
 const getSpaceUserDashboard = asyncHandler(async (req, res) => {
     console.log("Getting space user dashboard".yellow);
@@ -455,23 +456,36 @@ const getSpaceOwnerDashboard = asyncHandler(async (req, res) => {
         const uniqueUserIds = [...new Set(activeBookings.map(booking => booking.user.toString()))];
         const currentSpaceUsers = uniqueUserIds.length;
 
-        const messages = await Message.find({ receiver: userId })
-            .populate({
-                path: 'sender', 
-                select: 'profilePicture firstName lastName',
-            })
-            .populate({
-                path: 'listing', 
-                select: 'propertyName',
-            })
-            .sort({ timestamp: -1 });
+        const unreadMessages = await Message.aggregate([
+            { $match: { receiver: userId._id, isRead: false } }, // Match unread messages for the user
+            {
+                $group: {
+                    _id: '$sender', // Group by sender
+                    latestMessage: { $first: '$content' }, // Get the latest message content
+                    sentAt: { $first: '$timestamp' }, // Get the timestamp of the latest message
+                    unreadCount: { $sum: 1 }, // Count unread messages
+                },
+            },
+            {
+                $lookup: {
+                    from: 'users', // Assuming the sender is stored in the 'users' collection
+                    localField: '_id',
+                    foreignField: '_id',
+                    as: 'senderDetails',
+                },
+            },
+            { $unwind: '$senderDetails' }, // Flatten the senderDetails array
+        ]);
 
-        const formattedMessages = messages.map(message => ({
-            senderProfilePicture: message.sender.profilePicture || 'default-profile-url',
-            senderName: `${message.sender.firstName} ${message.sender.lastName}`,
-            propertyName: message.listing ? message.listing.propertyName : 'Unknown Property',
-            latestMessage: message.content,
-            sentAt: message.timestamp,
+        console.log(colors.green(`Total of ${unreadMessages.length} unread messages found`))
+
+        const formattedMessages = unreadMessages.map((message) => ({
+            senderProfilePicture: message.senderDetails.profilePicture || 'default-profile-url',
+            senderName: `${message.senderDetails.firstName} ${message.senderDetails.lastName}`,
+            propertyName: 'Loading', // Replace this if property info is needed
+            latestMessage: message.latestMessage,
+            sentAt: message.sentAt,
+            unreadCount: message.unreadCount,
         }));
 
         const allTotalListings = listings.length + draftListings.length
@@ -482,7 +496,9 @@ const getSpaceOwnerDashboard = asyncHandler(async (req, res) => {
             data: {
                 totalListings: allTotalListings,
                 currentSpaceUsers,
-                messages: formattedMessages,
+                messages: formattedMessages.length 
+                ? formattedMessages 
+                : "No new Messages at the moment",
             },
         });
 
