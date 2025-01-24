@@ -457,36 +457,61 @@ const getSpaceOwnerDashboard = asyncHandler(async (req, res) => {
         const currentSpaceUsers = uniqueUserIds.length;
 
         const unreadMessages = await Message.aggregate([
-            { $match: { receiver: userId._id, isRead: false } }, // Match unread messages for the user
             {
-                $group: {
-                    _id: '$sender', // Group by sender
-                    latestMessage: { $first: '$content' }, // Get the latest message content
-                    sentAt: { $first: '$timestamp' }, // Get the timestamp of the latest message
-                    unreadCount: { $sum: 1 }, // Count unread messages
-                },
+              $match: {
+                receiver: userId._id,
+                isRead: false,
+              }, // Match unread messages for the user
             },
             {
-                $lookup: {
-                    from: 'users', // Assuming the sender is stored in the 'users' collection
-                    localField: '_id',
-                    foreignField: '_id',
-                    as: 'senderDetails',
-                },
+              $group: {
+                _id: '$sender', // Group by sender
+                latestMessage: { $first: '$content' }, // Get the latest message content
+                sentAt: { $first: '$timestamp' }, // Get the timestamp of the latest message
+                unreadCount: { $sum: 1 }, // Count unread messages
+              },
             },
-            { $unwind: '$senderDetails' }, // Flatten the senderDetails array
-        ]);
-
-        console.log(colors.green(`Total of ${unreadMessages.length} unread messages found`))
-
-        const formattedMessages = unreadMessages.map((message) => ({
+            {
+              $lookup: {
+                from: 'users', // Lookup for sender details
+                localField: '_id',
+                foreignField: '_id',
+                as: 'senderDetails',
+              },
+            },
+            {
+              $unwind: '$senderDetails', // Flatten the senderDetails array
+            },
+            {
+              $lookup: {
+                from: 'listings', // Lookup for listing details
+                localField: '_id', // Adjust this field if it's not the correct match for listings
+                foreignField: 'listing', // Make sure this matches your listings schema
+                as: 'listingDetails',
+              },
+            },
+            {
+              $unwind: {
+                path: '$listingDetails',
+                preserveNullAndEmptyArrays: true, // Allow for entries without matching listings
+              },
+            },
+          ]);
+          
+          // Debugging Step: Log the result to check structure
+          console.log("Unread Messages Aggregation Result: ", JSON.stringify(unreadMessages, null, 2));
+          
+          // Formatting the messages
+          const formattedMessages = unreadMessages.map((message) => ({
             senderProfilePicture: message.senderDetails.profilePicture || 'default-profile-url',
             senderName: `${message.senderDetails.firstName} ${message.senderDetails.lastName}`,
-            propertyName: 'Loading', // Replace this if property info is needed
+            propertyName: message.listingDetails?.propertyName || 'Unknown Property', // Handle undefined listingDetails
             latestMessage: message.latestMessage,
             sentAt: message.sentAt,
             unreadCount: message.unreadCount,
-        }));
+          }));
+          
+          console.log(colors.green(`Total of ${unreadMessages.length} unread messages found`));
 
         const allTotalListings = listings.length + draftListings.length
 

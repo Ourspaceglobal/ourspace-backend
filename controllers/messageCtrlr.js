@@ -4,8 +4,8 @@ import Listing from "../models/listingModel.js";
 import Message from "../models/messageModel.js";
 import User from "../models/userModel.js";
 import cloudinaryConfig from "../uploadUtils/cloudinaryConfig.js";
+import colors from "colors"
 
-                                                                        // Cloudinary upload for pictures videos and voicenotes
 const uploadMessageMediaToCloudinary = async (item, isAudio = false) => {
   try {
     // Check if the item is a URL (already uploaded media)
@@ -260,7 +260,10 @@ const spaceUserGetAllChats = async (req, res) => {
   }
 };
 
-const getMessagesForAListing = asyncHandler(async (data) => {
+const getMessagesForAListing = asyncHandler(async (data, res) => {
+
+  console.log(colors.yellow("Getting all messages for a chat"))
+
   try {
     const {currentUserId, listingId, otherUserId } = data;
 
@@ -281,6 +284,7 @@ const getMessagesForAListing = asyncHandler(async (data) => {
       .exec();
 
     if (!messages || messages.length === 0) {
+      console.log(colors.red("No messages available at the moment"))
       return {
         success: true,
         message: 'No messages found for this listing',
@@ -288,7 +292,14 @@ const getMessagesForAListing = asyncHandler(async (data) => {
       };
     }
 
-    // Return only the messages content, timestamp, and media
+    for (let unreadMessage of messages) {
+      console.log(colors.grey("Updating isRead status"));
+    
+      if (!unreadMessage.isRead) {
+        unreadMessage.isRead = true;  // Set the isRead status on the message
+        await unreadMessage.save();  // Save the updated message
+      }
+    }
     
     return {
       success: true,
@@ -649,6 +660,43 @@ const chatWithSpaceUser= asyncHandler(async (req, res) => {
   }
 });
 
+const markMessagesAsRead = async(req, res) => {
+
+  console.log(colors.yellow("Updating message status to read"))
+
+  try {
+    const { senderId, propertyId} = req.body
+    const receiverId = req.user._id
+
+    if (!senderId || !propertyId) {
+      return res.status(400).json({
+          success: false,
+          message: 'SenderId and propertyId are required',
+      });
+    }
+    
+    // Update all messages for this chat, regardless of sender/receiver order
+    const result = await Message.updateMany(
+      {
+          propertyId: propertyId,
+          isRead: false,
+          $or: [
+              { sender: senderId, receiver: receiverId }, // Case 1: sender is senderId, receiver is receiverId
+              { sender: receiverId, receiver: senderId }, // Case 2: sender is receiverId, receiver is senderId
+          ],
+      },
+      { $set: { isRead: true } }
+  );
+
+  res.status(200).json({
+      success: true,
+      message: `${result.modifiedCount} messages marked as read`,
+  });
+
+  } catch (error) {
+    
+  }
+}
 
 export { 
   sendMessage, 
