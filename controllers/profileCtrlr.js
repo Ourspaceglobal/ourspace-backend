@@ -491,9 +491,6 @@ const getSpaceOwnerDashboard = asyncHandler(async (req, res) => {
         // Convert grouped results back to an array
         const formattedMessages = Object.values(groupedMessages);
 
-        // Debug the final output
-        console.log('Formatted Messages:', JSON.stringify(formattedMessages, null, 2));
-
         const allTotalListings = listings.length + draftListings.length
 
         res.status(200).json({

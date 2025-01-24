@@ -108,32 +108,43 @@ const spaceOwnerGetAllChats = async (req, res) => {
     const latestMessages = await getLatestMessagesForChats(listingIds, currentUserId);
 
     // Initialize an array to hold the final response data
-    const result = latestMessages.map(message => {
-      // Check if lastMessageContent is empty and if there's media or voice notes
-      const hasMedia = (message.messageMedia && message.messageMedia.length > 0) || 
-                       (message.voiceNote && message.voiceNote.length > 0);
-      const lastMessageContent = message.lastMessageContent || (hasMedia ? "new media file received" : '');
+    // Initialize an array to hold the final response data
+    const result = await Promise.all(
+      latestMessages.map(async (message) => {
+        // Check if lastMessageContent is empty and if there's media or voice notes
+        const hasMedia = (message.messageMedia && message.messageMedia.length > 0) || (message.voiceNote && message.voiceNote.length > 0);
+        const lastMessageContent = message.lastMessageContent || (hasMedia ? "new media file received" : '');
 
-      return {
-        propertyOwner: {
-          id: currentUserId,
-          name: req.user.firstName + " " + req.user.lastName,
-          profilePic: req.user.profilePic
-        },
-        propertyUser: {
-          id: message.propertyUser.id,
-          name: message.propertyUser.name,
-          profilePic: message.propertyUser.profilePic
-        },
-        property: {
-          id: message.listing.id,
-          name: message.listing.propertyName,
-          image: message.listing.bedroomPictures ? message.listing.bedroomPictures[0] : '' // First image
-        },
-        lastMessageContent: lastMessageContent,
-        lastMessageTimestamp: message.lastMessageTimestamp || Date.now()
-      };
-    });
+        // Calculate the number of unread messages for the chat
+        const unreadMessageCount = await Message.countDocuments({
+          listing: message.listing.id,
+          sender: message.propertyUser.id,
+          receiver: currentUserId,
+          isRead: false,
+        });
+
+        return {
+          propertyOwner: {
+            id: currentUserId,
+            name: req.user.firstName + " " + req.user.lastName,
+            profilePic: req.user.profilePic,
+          },
+          propertyUser: {
+            id: message.propertyUser.id,
+            name: message.propertyUser.name,
+            profilePic: message.propertyUser.profilePic,
+          },
+          property: {
+            id: message.listing.id,
+            name: message.listing.propertyName,
+            image: message.listing.bedroomPictures ? message.listing.bedroomPictures[0] : '', // First image
+          },
+          lastMessageContent: lastMessageContent,
+          lastMessageTimestamp: message.lastMessageTimestamp || Date.now(),
+          unreadMessageCount
+        };
+      })
+    );
 
     return res.status(200).json({
       success: true,
@@ -162,7 +173,7 @@ const spaceUserGetAllChats = async (req, res) => {
       console.log("Only space users are allowed".red);
       return res.status(403).json({
         success: false,
-        message: "Only space users are allowed"
+        message: "Only space users are allowed",
       });
     }
 
@@ -170,29 +181,31 @@ const spaceUserGetAllChats = async (req, res) => {
     const latestMessages = await Message.aggregate([
       {
         $match: {
-          $or: [{ sender: currentUserId }, { receiver: currentUserId }]
-        }
+          $or: [{ sender: currentUserId }, { receiver: currentUserId }],
+        },
       },
       { $sort: { createdAt: -1 } },
       {
         $group: {
           _id: {
             listing: "$listing",
-            otherUserId: { $cond: [{ $eq: ["$sender", currentUserId] }, "$receiver", "$sender"] }
+            otherUserId: {
+              $cond: [{ $eq: ["$sender", currentUserId] }, "$receiver", "$sender"],
+            },
           },
           lastMessageContent: { $first: "$content" },
           lastMessageTimestamp: { $first: "$createdAt" },
           messageMedia: { $first: "$messageMedia" }, // Include messageMedia
-          voiceNote: { $first: "$voiceNote" } // Include voiceNote
-        }
+          voiceNote: { $first: "$voiceNote" }, // Include voiceNote
+        },
       },
       {
         $lookup: {
           from: "users",
           localField: "_id.otherUserId",
           foreignField: "_id",
-          as: "propertyUser"
-        }
+          as: "propertyUser",
+        },
       },
       { $unwind: "$propertyUser" },
       {
@@ -200,8 +213,8 @@ const spaceUserGetAllChats = async (req, res) => {
           from: "listings",
           localField: "_id.listing",
           foreignField: "_id",
-          as: "listingDetails"
-        }
+          as: "listingDetails",
+        },
       },
       { $unwind: "$listingDetails" },
       {
@@ -209,37 +222,77 @@ const spaceUserGetAllChats = async (req, res) => {
           from: "users",
           localField: "listingDetails.user",
           foreignField: "_id",
-          as: "propertyOwner"
-        }
+          as: "propertyOwner",
+        },
       },
       { $unwind: "$propertyOwner" },
+      // Count unread messages for the current chat
+      {
+        $lookup: {
+          from: "messages", // Message collection
+          let: { listingId: "$_id.listing", otherUserId: "$_id.otherUserId" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$listing", "$$listingId"] },
+                    { $eq: ["$sender", "$$otherUserId"] },
+                    { $eq: ["$receiver", currentUserId] },
+                    { $eq: ["$isRead", false] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: "unreadMessages",
+        },
+      },
+      {
+        $addFields: {
+          unreadMessageCount: { $size: "$unreadMessages" }, // Calculate the count
+        },
+      },
       {
         $project: {
           propertyOwner: {
             id: "$propertyOwner._id",
-            name: { $concat: ["$propertyOwner.firstName", " ", "$propertyOwner.lastName"] },
-            profilePic: { $ifNull: ["$propertyOwner.profilePic", ""] }
+            name: {
+              $concat: ["$propertyOwner.firstName", " ", "$propertyOwner.lastName"],
+            },
+            profilePic: { $ifNull: ["$propertyOwner.profilePic", ""] },
           },
           propertyUser: {
             id: currentUserId,
             name: req.user.firstName + " " + req.user.lastName,
-            profilePic: req.user.profilePic
+            profilePic: req.user.profilePic,
           },
           property: {
             id: "$listingDetails._id",
             name: "$listingDetails.propertyName",
-            image: { $arrayElemAt: ["$listingDetails.bedroomPictures", 0] } // First image
+            image: { $arrayElemAt: ["$listingDetails.bedroomPictures", 0] }, // First image
           },
           lastMessageContent: {
             $cond: [
-              { $and: [{ $eq: ["$lastMessageContent", ""] }, { $or: [{ $ne: ["$messageMedia", []] }, { $ne: ["$voiceNote", []] }] }] },
+              {
+                $and: [
+                  { $eq: ["$lastMessageContent", ""] },
+                  {
+                    $or: [
+                      { $ne: ["$messageMedia", []] },
+                      { $ne: ["$voiceNote", []] },
+                    ],
+                  },
+                ],
+              },
               "New media file received",
-              "$lastMessageContent"
-            ]
+              "$lastMessageContent",
+            ],
           },
-          lastMessageTimestamp: "$lastMessageTimestamp"
-        }
-      }
+          lastMessageTimestamp: "$lastMessageTimestamp",
+          unreadMessageCount: 1, // Add the unread message count
+        },
+      },
     ]);
 
     console.log("All messages for space user retrieved".green);
@@ -248,17 +301,18 @@ const spaceUserGetAllChats = async (req, res) => {
       success: true,
       message: "Messages retrieved successfully",
       total: latestMessages.length,
-      data: latestMessages
+      data: latestMessages,
     });
   } catch (error) {
     console.error("Error getting all chats for space users", error);
     return res.status(500).json({
       success: false,
       message: "Error getting all chats for space users",
-      error
+      error,
     });
   }
 };
+
 
 const getMessagesForAListing = asyncHandler(async (data, res) => {
 
