@@ -456,62 +456,43 @@ const getSpaceOwnerDashboard = asyncHandler(async (req, res) => {
         const uniqueUserIds = [...new Set(activeBookings.map(booking => booking.user.toString()))];
         const currentSpaceUsers = uniqueUserIds.length;
 
-        const unreadMessages = await Message.aggregate([
-            {
-              $match: {
-                receiver: userId._id,
-                isRead: false,
-              }, // Match unread messages for the user
-            },
-            {
-              $group: {
-                _id: '$sender', // Group by sender
-                latestMessage: { $first: '$content' }, // Get the latest message content
-                sentAt: { $first: '$timestamp' }, // Get the timestamp of the latest message
-                unreadCount: { $sum: 1 }, // Count unread messages
-              },
-            },
-            {
-              $lookup: {
-                from: 'users', // Lookup for sender details
-                localField: '_id',
-                foreignField: '_id',
-                as: 'senderDetails',
-              },
-            },
-            {
-              $unwind: '$senderDetails', // Flatten the senderDetails array
-            },
-            {
-              $lookup: {
-                from: 'listings', // Lookup for listing details
-                localField: '_id', // Adjust this field if it's not the correct match for listings
-                foreignField: 'listing', // Make sure this matches your listings schema
-                as: 'listingDetails',
-              },
-            },
-            {
-              $unwind: {
-                path: '$listingDetails',
-                preserveNullAndEmptyArrays: true, // Allow for entries without matching listings
-              },
-            },
-          ]);
-          
-          // Debugging Step: Log the result to check structure
-          console.log("Unread Messages Aggregation Result: ", JSON.stringify(unreadMessages, null, 2));
-          
-          // Formatting the messages
-          const formattedMessages = unreadMessages.map((message) => ({
-            senderProfilePicture: message.senderDetails.profilePicture || 'default-profile-url',
-            senderName: `${message.senderDetails.firstName} ${message.senderDetails.lastName}`,
-            propertyName: message.listingDetails?.propertyName || 'Unknown Property', // Handle undefined listingDetails
-            latestMessage: message.latestMessage,
-            sentAt: message.sentAt,
-            unreadCount: message.unreadCount,
-          }));
-          
-          console.log(colors.green(`Total of ${unreadMessages.length} unread messages found`));
+        const messages = await Message.find({ receiver: userId, isRead: false })
+        .populate({
+            path: 'sender',
+            select: 'profilePicture firstName lastName',
+        })
+        .populate({
+            path: 'listing',
+            select: 'propertyName',
+        })
+        .sort({ timestamp: -1 }); // Sort by latest message
+
+        // Process and group the data
+        const groupedMessages = messages.reduce((acc, message) => {
+        const senderId = message.sender._id.toString();
+
+        if (!acc[senderId]) {
+            acc[senderId] = {
+            senderProfilePicture: message.sender.profilePicture || 'default-profile-url',
+            senderName: `${message.sender.firstName} ${message.sender.lastName}`,
+            propertyName: message.listing?.propertyName || 'Unknown Property',
+            latestMessage: message.content,
+            sentAt: message.timestamp,
+            unreadCount: 0,
+            };
+        }
+
+        // Increment unread count for each sender
+        acc[senderId].unreadCount += 1;
+
+        return acc;
+        }, {});
+
+        // Convert grouped results back to an array
+        const formattedMessages = Object.values(groupedMessages);
+
+        // Debug the final output
+        console.log('Formatted Messages:', JSON.stringify(formattedMessages, null, 2));
 
         const allTotalListings = listings.length + draftListings.length
 
