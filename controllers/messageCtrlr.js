@@ -321,21 +321,27 @@ const getMessagesForAListing = asyncHandler(async (data, res) => {
   try {
     const {currentUserId, listingId, otherUserId } = data;
 
+    console.log("Current user id: ", currentUserId)
+    console.log("other user Id: ", otherUserId)
+    console.log("Listing Id: ", listingId)
+
     // Find all messages between the current user and the other user for a specific listing
     const messages = await Message.find({
       $and: [
         { listing: listingId }, // Messages related to the listing
         {
           $or: [
-            { sender: currentUserId, receiver: otherUserId }, 
+            { sender: currentUserId, receiver: otherUserId },
             { sender: otherUserId, receiver: currentUserId },
           ],
         },
       ],
     })
-      .sort({ timestamp: 1 }) // Sort by timestamp (oldest to newest)
-      .populate('sender', 'profilePic') // Populate the sender's profilePic
+      .sort({ timestamp: 1 })
+      .populate('sender', 'profilePic')
       .exec();
+
+      console.log("Messages: ", messages)
 
     if (!messages || messages.length === 0) {
       console.log(colors.red("No messages available at the moment"))
@@ -346,15 +352,14 @@ const getMessagesForAListing = asyncHandler(async (data, res) => {
       };
     }
 
-    for (let unreadMessage of messages) {
-      console.log(colors.grey("Updating isRead status"));
-    
-      if (!unreadMessage.isRead) {
-        unreadMessage.isRead = true;  // Set the isRead status on the message
-        await unreadMessage.save();  // Save the updated message
+    for (let message of messages) {
+      if (!message.isRead) {
+        console.log("Updating message read count status".green)
+        message.isRead = true;
+        await message.save();
       }
-    }
-    
+    }    
+
     return {
       success: true,
       message: 'Messages retrieved successfully for the listing',
@@ -714,43 +719,109 @@ const chatWithSpaceUser= asyncHandler(async (req, res) => {
   }
 });
 
-const markMessagesAsRead = async(req, res) => {
+// const markMessagesAsRead = async(req, res) => {
 
-  console.log(colors.yellow("Updating message status to read"))
+//   console.log(colors.yellow("Updating message status to read"))
 
-  try {
-    const { senderId, propertyId} = req.body
-    const receiverId = req.user._id
+//   try {
+//     const { senderId, propertyId} = req.body
+//     const receiverId = req.user._id
 
-    if (!senderId || !propertyId) {
-      return res.status(400).json({
-          success: false,
-          message: 'SenderId and propertyId are required',
-      });
-    }
+//     if (!senderId || !propertyId) {
+//       return res.status(400).json({
+//           success: false,
+//           message: 'SenderId and propertyId are required',
+//       });
+//     }
     
-    // Update all messages for this chat, regardless of sender/receiver order
-    const result = await Message.updateMany(
-      {
-          propertyId: propertyId,
-          isRead: false,
-          $or: [
-              { sender: senderId, receiver: receiverId }, // Case 1: sender is senderId, receiver is receiverId
-              { sender: receiverId, receiver: senderId }, // Case 2: sender is receiverId, receiver is senderId
-          ],
-      },
-      { $set: { isRead: true } }
-  );
+//     // Update all messages for this chat, regardless of sender/receiver order
+//     const result = await Message.updateMany(
+//       {
+//           propertyId: propertyId,
+//           isRead: false,
+//           $or: [
+//               { sender: senderId, receiver: receiverId }, // Case 1: sender is senderId, receiver is receiverId
+//               { sender: receiverId, receiver: senderId }, // Case 2: sender is receiverId, receiver is senderId
+//           ],
+//       },
+//       { $set: { isRead: true } }
+//   );
 
-  res.status(200).json({
-      success: true,
-      message: `${result.modifiedCount} messages marked as read`,
-  });
+//   res.status(200).json({
+//       success: true,
+//       message: `${result.modifiedCount} messages marked as read`,
+//   });
 
-  } catch (error) {
+//   } catch (error) {
     
-  }
-}
+//   }
+// }
+
+// const getMessagesForAListingPostman = asyncHandler(async (req, res) => {
+
+//   console.log(colors.yellow("postman Getting all messages for a chat"))
+
+//   try {
+//     const {listingId, otherUserId } = req.body;
+
+//     console.log("Current user id: ", req.user._id)
+//     console.log("other user Id: ", otherUserId)
+//     console.log("Listing Id: ", listingId)
+
+//     // Find all messages between the current user and the other user for a specific listing
+//     const messages = await Message.find({
+//       $and: [
+//         { listing: listingId }, // Messages related to the listing
+//         {
+//           $or: [
+//             { sender: req.user._id, receiver: otherUserId },
+//             { sender: otherUserId, receiver: req.user._id },
+//           ],
+//         },
+//       ],
+//     })
+//       .sort({ timestamp: 1 })
+//       .populate('sender', 'profilePic')
+//       .exec();
+
+//     if (!messages || messages.length === 0) {
+//       console.log(colors.red("No messages available at the moment"))
+//       return res.status(200).json({
+//           success: true,
+//           message: 'No messages found for this listing',
+//           data: [],
+
+//       })
+//     }
+
+//     for (let message of messages) {
+//       if (!message.isRead) {
+//         console.log("Updating message read count status".green)
+//         message.isRead = true;
+//         await message.save();
+//       }
+//     }    
+
+//     res.status(200).json({
+//         success: true,
+//         message: 'Messages retrieved successfully for the listing',
+//         total: messages.length,
+//         data: messages.map(message => ({
+//           senderId: message.sender._id,
+//           displayImage: message.sender.profilePic,
+//           content: message.content,
+//           timestamp: message.timestamp,
+//           messageMedia: message.messageMedia,
+//           voiceNote: message.voiceNote,
+//           isRead: message.isRead
+//         })),
+//     })
+//     ;
+//   } catch (error) {
+//     console.log("Something went wrong", error);
+//     return { success: false, message: "Something went wrong", error };
+//   }
+// });
 
 export { 
   sendMessage, 
@@ -759,6 +830,6 @@ export {
   getMessagesForAListing,
   postmanSendMessage,
   chatWithSpaceOwner,
-  chatWithSpaceUser
+  chatWithSpaceUser,
 };
 

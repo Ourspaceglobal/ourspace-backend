@@ -1,7 +1,7 @@
 import express from "express";
 
 import {admin, protect, spaceOwner, spaceUser, superAdmin} from "../middleware/authMiddleware.js"
-import {chatWithSpaceOwner, getMessagesForAListing, postmanSendMessage, sendMessage, spaceOwnerGetAllChats, spaceUserGetAllChats } from "../controllers/messageCtrlr.js";
+import {chatWithSpaceOwner, getMessagesForAListing, postmanSendMessage, spaceOwnerGetAllChats, spaceUserGetAllChats } from "../controllers/messageCtrlr.js";
 import upload from "../uploadUtils/multer.js";
 
 
@@ -25,6 +25,11 @@ router
 router
 .route("/get-messages-for-a-listing")
 .post(protect, getMessagesForAListing)
+
+// //
+// router
+// .route("/postman-get-messages-for-a-listing")
+// .post(protect, getMessagesForAListingPostman)
 
 //
 router
